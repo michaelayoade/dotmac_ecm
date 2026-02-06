@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "starter_template"
+name = "dotmac_ecm"
 version = "0.1.0"
-description = "Starter API and web UI template"
+description = "Electronic Content Management application"
 authors = ["Codex <codex@local>"]
 package-mode = false
 

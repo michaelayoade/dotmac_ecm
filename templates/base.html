@@ -7,7 +7,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="htmx-config" content='{"defaultSwapStyle":"innerHTML","globalViewTransitions":true}' />
-    <title>{% block title %}{{ title | default("Starter Template") }}{% endblock %}</title>
+    <title>{% block title %}{{ title | default("DotMac ECM") }}{% endblock %}</title>
 
     <!-- Custom Fonts: Outfit (display) + Plus Jakarta Sans (body) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -238,10 +238,10 @@
 <body class="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100 antialiased"
       hx-ext="loading-states">
 
-    {% set brand_name = brand.name | default("Starter Template") %}
-    {% set brand_tagline = brand.tagline | default("FastAPI starter", true) %}
+    {% set brand_name = brand.name | default("DotMac ECM") %}
+    {% set brand_tagline = brand.tagline | default("Electronic Content Management", true) %}
     {% set brand_logo_url = brand.logo_url | default("", true) %}
-    {% set brand_mark = brand.mark | default("ST") %}
+    {% set brand_mark = brand.mark | default("ECM") %}
 
     {% block body %}
     <div class="relative">

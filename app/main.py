@@ -43,7 +43,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Starter Template API", lifespan=lifespan)
+app = FastAPI(title="DotMac ECM API", lifespan=lifespan)
 
 _AUDIT_SETTINGS_CACHE: dict | None = None
 _AUDIT_SETTINGS_CACHE_AT: float | None = None

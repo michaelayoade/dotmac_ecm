@@ -95,7 +95,7 @@ SETTINGS_SPECS: list[SettingSpec] = [
         key="totp_issuer",
         env_var="TOTP_ISSUER",
         value_type=SettingValueType.string,
-        default="starter_template",
+        default="dotmac_ecm",
     ),
     SettingSpec(
         domain=SettingDomain.auth,

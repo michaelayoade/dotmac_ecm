@@ -49,8 +49,8 @@ class MockSettings:
     avatar_max_size_bytes = 2 * 1024 * 1024
     avatar_allowed_types = "image/jpeg,image/png,image/gif,image/webp"
     avatar_url_prefix = "/static/avatars"
-    brand_name = "Starter Template"
-    brand_tagline = "FastAPI starter"
+    brand_name = "DotMac ECM"
+    brand_tagline = "Electronic Content Management"
     brand_logo_url = None
 
 
