@@ -1,3 +1,5 @@
+from collections.abc import Generator
+
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
@@ -17,10 +19,14 @@ from app.services import ecm_retention as ret_service
 router = APIRouter(prefix="/ecm", tags=["ecm-retention"])
 
 
-def get_db():
+def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
         yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 
@@ -37,7 +43,7 @@ def get_db():
 )
 def create_retention_policy(
     payload: RetentionPolicyCreate, db: Session = Depends(get_db)
-):
+) -> RetentionPolicyRead:
     return ret_service.retention_policies.create(db, payload)
 
 
@@ -45,7 +51,9 @@ def create_retention_policy(
     "/retention-policies/{policy_id}",
     response_model=RetentionPolicyRead,
 )
-def get_retention_policy(policy_id: str, db: Session = Depends(get_db)):
+def get_retention_policy(
+    policy_id: str, db: Session = Depends(get_db)
+) -> RetentionPolicyRead:
     return ret_service.retention_policies.get(db, policy_id)
 
 
@@ -63,7 +71,7 @@ def list_retention_policies(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-):
+) -> dict:
     return ret_service.retention_policies.list_response(
         db,
         disposition_action,
@@ -85,7 +93,7 @@ def update_retention_policy(
     policy_id: str,
     payload: RetentionPolicyUpdate,
     db: Session = Depends(get_db),
-):
+) -> RetentionPolicyRead:
     return ret_service.retention_policies.update(db, policy_id, payload)
 
 
@@ -93,7 +101,7 @@ def update_retention_policy(
     "/retention-policies/{policy_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
-def delete_retention_policy(policy_id: str, db: Session = Depends(get_db)):
+def delete_retention_policy(policy_id: str, db: Session = Depends(get_db)) -> None:
     ret_service.retention_policies.delete(db, policy_id)
 
 
@@ -109,7 +117,7 @@ def delete_retention_policy(policy_id: str, db: Session = Depends(get_db)):
 )
 def create_document_retention(
     payload: DocumentRetentionCreate, db: Session = Depends(get_db)
-):
+) -> DocumentRetentionRead:
     return ret_service.document_retentions.create(db, payload)
 
 
@@ -117,7 +125,9 @@ def create_document_retention(
     "/document-retentions/{retention_id}",
     response_model=DocumentRetentionRead,
 )
-def get_document_retention(retention_id: str, db: Session = Depends(get_db)):
+def get_document_retention(
+    retention_id: str, db: Session = Depends(get_db)
+) -> DocumentRetentionRead:
     return ret_service.document_retentions.get(db, retention_id)
 
 
@@ -135,7 +145,7 @@ def list_document_retentions(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-):
+) -> dict:
     return ret_service.document_retentions.list_response(
         db,
         document_id,
@@ -157,7 +167,7 @@ def update_document_retention(
     retention_id: str,
     payload: DocumentRetentionUpdate,
     db: Session = Depends(get_db),
-):
+) -> DocumentRetentionRead:
     return ret_service.document_retentions.update(db, retention_id, payload)
 
 
@@ -165,7 +175,7 @@ def update_document_retention(
     "/document-retentions/{retention_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
-def delete_document_retention(retention_id: str, db: Session = Depends(get_db)):
+def delete_document_retention(retention_id: str, db: Session = Depends(get_db)) -> None:
     ret_service.document_retentions.delete(db, retention_id)
 
 
@@ -177,7 +187,7 @@ def dispose_document_retention(
     retention_id: str,
     payload: DisposeRequest,
     db: Session = Depends(get_db),
-):
+) -> DocumentRetentionRead:
     return ret_service.document_retentions.dispose(
         db, retention_id, str(payload.disposed_by)
     )

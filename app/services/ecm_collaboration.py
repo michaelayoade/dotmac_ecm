@@ -1,6 +1,7 @@
 import logging
 
 from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.ecm import (
@@ -60,7 +61,7 @@ class Comments(ListResponseMixin):
         data["status"] = CommentStatus(data["status"])
         comment = Comment(**data)
         db.add(comment)
-        db.commit()
+        db.flush()
         db.refresh(comment)
         logger.info("Created comment %s", comment.id)
         publish_event(
@@ -92,26 +93,26 @@ class Comments(ListResponseMixin):
         limit: int,
         offset: int,
     ) -> list[Comment]:
-        query = db.query(Comment)
+        stmt = select(Comment)
         if document_id is not None:
-            query = query.filter(Comment.document_id == coerce_uuid(document_id))
+            stmt = stmt.where(Comment.document_id == coerce_uuid(document_id))
         if author_id is not None:
-            query = query.filter(Comment.author_id == coerce_uuid(author_id))
+            stmt = stmt.where(Comment.author_id == coerce_uuid(author_id))
         if parent_id is not None:
-            query = query.filter(Comment.parent_id == coerce_uuid(parent_id))
+            stmt = stmt.where(Comment.parent_id == coerce_uuid(parent_id))
         if status is not None:
-            query = query.filter(Comment.status == CommentStatus(status))
+            stmt = stmt.where(Comment.status == CommentStatus(status))
         if is_active is None:
-            query = query.filter(Comment.is_active.is_(True))
+            stmt = stmt.where(Comment.is_active.is_(True))
         else:
-            query = query.filter(Comment.is_active == is_active)
-        query = apply_ordering(
-            query,
+            stmt = stmt.where(Comment.is_active == is_active)
+        stmt = apply_ordering(
+            stmt,
             order_by,
             order_dir,
             {"created_at": Comment.created_at},
         )
-        return apply_pagination(query, limit, offset).all()
+        return db.scalars(apply_pagination(stmt, limit, offset)).all()
 
     @staticmethod
     def update(db: Session, comment_id: str, payload: CommentUpdate) -> Comment:
@@ -124,7 +125,7 @@ class Comments(ListResponseMixin):
             data["status"] = CommentStatus(data["status"])
         for key, value in data.items():
             setattr(comment, key, value)
-        db.commit()
+        db.flush()
         db.refresh(comment)
         logger.info("Updated comment %s", comment.id)
         publish_event(
@@ -143,7 +144,7 @@ class Comments(ListResponseMixin):
             raise HTTPException(status_code=404, detail="Comment not found")
         doc_id = comment.document_id
         comment.is_active = False
-        db.commit()
+        db.flush()
         logger.info("Soft-deleted comment %s", comment_id)
         publish_event(
             EventType.comment_deleted,
@@ -171,7 +172,7 @@ class DocumentSubscriptions(ListResponseMixin):
         data = payload.model_dump()
         sub = DocumentSubscription(**data)
         db.add(sub)
-        db.commit()
+        db.flush()
         db.refresh(sub)
         logger.info("Created document subscription %s", sub.id)
         return sub
@@ -196,26 +197,24 @@ class DocumentSubscriptions(ListResponseMixin):
         limit: int,
         offset: int,
     ) -> list[DocumentSubscription]:
-        query = db.query(DocumentSubscription)
+        stmt = select(DocumentSubscription)
         if document_id is not None:
-            query = query.filter(
+            stmt = stmt.where(
                 DocumentSubscription.document_id == coerce_uuid(document_id)
             )
         if person_id is not None:
-            query = query.filter(
-                DocumentSubscription.person_id == coerce_uuid(person_id)
-            )
+            stmt = stmt.where(DocumentSubscription.person_id == coerce_uuid(person_id))
         if is_active is None:
-            query = query.filter(DocumentSubscription.is_active.is_(True))
+            stmt = stmt.where(DocumentSubscription.is_active.is_(True))
         else:
-            query = query.filter(DocumentSubscription.is_active == is_active)
-        query = apply_ordering(
-            query,
+            stmt = stmt.where(DocumentSubscription.is_active == is_active)
+        stmt = apply_ordering(
+            stmt,
             order_by,
             order_dir,
             {"created_at": DocumentSubscription.created_at},
         )
-        return apply_pagination(query, limit, offset).all()
+        return db.scalars(apply_pagination(stmt, limit, offset)).all()
 
     @staticmethod
     def update(
@@ -231,7 +230,7 @@ class DocumentSubscriptions(ListResponseMixin):
         data = payload.model_dump(exclude_unset=True)
         for key, value in data.items():
             setattr(sub, key, value)
-        db.commit()
+        db.flush()
         db.refresh(sub)
         logger.info("Updated document subscription %s", sub.id)
         return sub
@@ -244,7 +243,7 @@ class DocumentSubscriptions(ListResponseMixin):
                 status_code=404, detail="Document subscription not found"
             )
         sub.is_active = False
-        db.commit()
+        db.flush()
         logger.info("Soft-deleted document subscription %s", subscription_id)
 
 

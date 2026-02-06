@@ -1,3 +1,5 @@
+from collections.abc import Generator
+
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
@@ -16,10 +18,14 @@ from app.services import ecm_acl as acl_service
 router = APIRouter(prefix="/ecm", tags=["ecm-acl"])
 
 
-def get_db():
+def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
         yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 
@@ -34,12 +40,14 @@ def get_db():
     response_model=DocumentACLRead,
     status_code=status.HTTP_201_CREATED,
 )
-def create_document_acl(payload: DocumentACLCreate, db: Session = Depends(get_db)):
+def create_document_acl(
+    payload: DocumentACLCreate, db: Session = Depends(get_db)
+) -> DocumentACLRead:
     return acl_service.document_acls.create(db, payload)
 
 
 @router.get("/document-acls/{acl_id}", response_model=DocumentACLRead)
-def get_document_acl(acl_id: str, db: Session = Depends(get_db)):
+def get_document_acl(acl_id: str, db: Session = Depends(get_db)) -> DocumentACLRead:
     return acl_service.document_acls.get(db, acl_id)
 
 
@@ -55,7 +63,7 @@ def list_document_acls(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-):
+) -> dict:
     return acl_service.document_acls.list_response(
         db,
         document_id,
@@ -73,12 +81,12 @@ def list_document_acls(
 @router.patch("/document-acls/{acl_id}", response_model=DocumentACLRead)
 def update_document_acl(
     acl_id: str, payload: DocumentACLUpdate, db: Session = Depends(get_db)
-):
+) -> DocumentACLRead:
     return acl_service.document_acls.update(db, acl_id, payload)
 
 
 @router.delete("/document-acls/{acl_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_document_acl(acl_id: str, db: Session = Depends(get_db)):
+def delete_document_acl(acl_id: str, db: Session = Depends(get_db)) -> None:
     acl_service.document_acls.delete(db, acl_id)
 
 
@@ -92,12 +100,14 @@ def delete_document_acl(acl_id: str, db: Session = Depends(get_db)):
     response_model=FolderACLRead,
     status_code=status.HTTP_201_CREATED,
 )
-def create_folder_acl(payload: FolderACLCreate, db: Session = Depends(get_db)):
+def create_folder_acl(
+    payload: FolderACLCreate, db: Session = Depends(get_db)
+) -> FolderACLRead:
     return acl_service.folder_acls.create(db, payload)
 
 
 @router.get("/folder-acls/{acl_id}", response_model=FolderACLRead)
-def get_folder_acl(acl_id: str, db: Session = Depends(get_db)):
+def get_folder_acl(acl_id: str, db: Session = Depends(get_db)) -> FolderACLRead:
     return acl_service.folder_acls.get(db, acl_id)
 
 
@@ -114,7 +124,7 @@ def list_folder_acls(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-):
+) -> dict:
     return acl_service.folder_acls.list_response(
         db,
         folder_id,
@@ -133,10 +143,10 @@ def list_folder_acls(
 @router.patch("/folder-acls/{acl_id}", response_model=FolderACLRead)
 def update_folder_acl(
     acl_id: str, payload: FolderACLUpdate, db: Session = Depends(get_db)
-):
+) -> FolderACLRead:
     return acl_service.folder_acls.update(db, acl_id, payload)
 
 
 @router.delete("/folder-acls/{acl_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_folder_acl(acl_id: str, db: Session = Depends(get_db)):
+def delete_folder_acl(acl_id: str, db: Session = Depends(get_db)) -> None:
     acl_service.folder_acls.delete(db, acl_id)

@@ -1,3 +1,5 @@
+from collections.abc import Generator
+
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
@@ -16,10 +18,14 @@ from app.services import ecm_collaboration as collab_service
 router = APIRouter(prefix="/ecm", tags=["ecm-collaboration"])
 
 
-def get_db():
+def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
         yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 
@@ -34,12 +40,14 @@ def get_db():
     response_model=CommentRead,
     status_code=status.HTTP_201_CREATED,
 )
-def create_comment(payload: CommentCreate, db: Session = Depends(get_db)):
+def create_comment(
+    payload: CommentCreate, db: Session = Depends(get_db)
+) -> CommentRead:
     return collab_service.comments.create(db, payload)
 
 
 @router.get("/comments/{comment_id}", response_model=CommentRead)
-def get_comment(comment_id: str, db: Session = Depends(get_db)):
+def get_comment(comment_id: str, db: Session = Depends(get_db)) -> CommentRead:
     return collab_service.comments.get(db, comment_id)
 
 
@@ -55,7 +63,7 @@ def list_comments(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-):
+) -> dict:
     return collab_service.comments.list_response(
         db,
         document_id,
@@ -73,12 +81,12 @@ def list_comments(
 @router.patch("/comments/{comment_id}", response_model=CommentRead)
 def update_comment(
     comment_id: str, payload: CommentUpdate, db: Session = Depends(get_db)
-):
+) -> CommentRead:
     return collab_service.comments.update(db, comment_id, payload)
 
 
 @router.delete("/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_comment(comment_id: str, db: Session = Depends(get_db)):
+def delete_comment(comment_id: str, db: Session = Depends(get_db)) -> None:
     collab_service.comments.delete(db, comment_id)
 
 
@@ -94,7 +102,7 @@ def delete_comment(comment_id: str, db: Session = Depends(get_db)):
 )
 def create_document_subscription(
     payload: DocumentSubscriptionCreate, db: Session = Depends(get_db)
-):
+) -> DocumentSubscriptionRead:
     return collab_service.document_subscriptions.create(db, payload)
 
 
@@ -102,7 +110,9 @@ def create_document_subscription(
     "/document-subscriptions/{subscription_id}",
     response_model=DocumentSubscriptionRead,
 )
-def get_document_subscription(subscription_id: str, db: Session = Depends(get_db)):
+def get_document_subscription(
+    subscription_id: str, db: Session = Depends(get_db)
+) -> DocumentSubscriptionRead:
     return collab_service.document_subscriptions.get(db, subscription_id)
 
 
@@ -119,7 +129,7 @@ def list_document_subscriptions(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-):
+) -> dict:
     return collab_service.document_subscriptions.list_response(
         db,
         document_id,
@@ -140,7 +150,7 @@ def update_document_subscription(
     subscription_id: str,
     payload: DocumentSubscriptionUpdate,
     db: Session = Depends(get_db),
-):
+) -> DocumentSubscriptionRead:
     return collab_service.document_subscriptions.update(db, subscription_id, payload)
 
 
@@ -148,5 +158,7 @@ def update_document_subscription(
     "/document-subscriptions/{subscription_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
-def delete_document_subscription(subscription_id: str, db: Session = Depends(get_db)):
+def delete_document_subscription(
+    subscription_id: str, db: Session = Depends(get_db)
+) -> None:
     collab_service.document_subscriptions.delete(db, subscription_id)

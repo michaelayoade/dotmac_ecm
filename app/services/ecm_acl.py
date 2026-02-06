@@ -1,6 +1,7 @@
 import logging
 
 from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.ecm import (
@@ -77,7 +78,7 @@ class DocumentACLs(ListResponseMixin):
         data["permission"] = ACLPermission(data["permission"])
         acl = DocumentACL(**data)
         db.add(acl)
-        db.commit()
+        db.flush()
         db.refresh(acl)
         logger.info("Created document ACL %s", acl.id)
         publish_event(
@@ -110,28 +111,28 @@ class DocumentACLs(ListResponseMixin):
         limit: int,
         offset: int,
     ) -> list[DocumentACL]:
-        query = db.query(DocumentACL)
+        stmt = select(DocumentACL)
         if document_id is not None:
-            query = query.filter(DocumentACL.document_id == coerce_uuid(document_id))
+            stmt = stmt.where(DocumentACL.document_id == coerce_uuid(document_id))
         if principal_type is not None:
-            query = query.filter(
+            stmt = stmt.where(
                 DocumentACL.principal_type == PrincipalType(principal_type)
             )
         if principal_id is not None:
-            query = query.filter(DocumentACL.principal_id == coerce_uuid(principal_id))
+            stmt = stmt.where(DocumentACL.principal_id == coerce_uuid(principal_id))
         if permission is not None:
-            query = query.filter(DocumentACL.permission == ACLPermission(permission))
+            stmt = stmt.where(DocumentACL.permission == ACLPermission(permission))
         if is_active is None:
-            query = query.filter(DocumentACL.is_active.is_(True))
+            stmt = stmt.where(DocumentACL.is_active.is_(True))
         else:
-            query = query.filter(DocumentACL.is_active == is_active)
-        query = apply_ordering(
-            query,
+            stmt = stmt.where(DocumentACL.is_active == is_active)
+        stmt = apply_ordering(
+            stmt,
             order_by,
             order_dir,
             {"created_at": DocumentACL.created_at},
         )
-        return apply_pagination(query, limit, offset).all()
+        return db.scalars(apply_pagination(stmt, limit, offset)).all()
 
     @staticmethod
     def update(db: Session, acl_id: str, payload: DocumentACLUpdate) -> DocumentACL:
@@ -155,7 +156,7 @@ class DocumentACLs(ListResponseMixin):
             _validate_grantor(db, str(data["granted_by"]))
         for key, value in data.items():
             setattr(acl, key, value)
-        db.commit()
+        db.flush()
         db.refresh(acl)
         logger.info("Updated document ACL %s", acl.id)
         return acl
@@ -167,7 +168,7 @@ class DocumentACLs(ListResponseMixin):
             raise HTTPException(status_code=404, detail="Document ACL not found")
         doc_id = acl.document_id
         acl.is_active = False
-        db.commit()
+        db.flush()
         logger.info("Soft-deleted document ACL %s", acl_id)
         publish_event(
             EventType.acl_revoked,
@@ -196,7 +197,7 @@ class FolderACLs(ListResponseMixin):
         data["permission"] = ACLPermission(data["permission"])
         acl = FolderACL(**data)
         db.add(acl)
-        db.commit()
+        db.flush()
         db.refresh(acl)
         logger.info("Created folder ACL %s", acl.id)
         publish_event(
@@ -232,30 +233,28 @@ class FolderACLs(ListResponseMixin):
         limit: int,
         offset: int,
     ) -> list[FolderACL]:
-        query = db.query(FolderACL)
+        stmt = select(FolderACL)
         if folder_id is not None:
-            query = query.filter(FolderACL.folder_id == coerce_uuid(folder_id))
+            stmt = stmt.where(FolderACL.folder_id == coerce_uuid(folder_id))
         if principal_type is not None:
-            query = query.filter(
-                FolderACL.principal_type == PrincipalType(principal_type)
-            )
+            stmt = stmt.where(FolderACL.principal_type == PrincipalType(principal_type))
         if principal_id is not None:
-            query = query.filter(FolderACL.principal_id == coerce_uuid(principal_id))
+            stmt = stmt.where(FolderACL.principal_id == coerce_uuid(principal_id))
         if permission is not None:
-            query = query.filter(FolderACL.permission == ACLPermission(permission))
+            stmt = stmt.where(FolderACL.permission == ACLPermission(permission))
         if is_inherited is not None:
-            query = query.filter(FolderACL.is_inherited == is_inherited)
+            stmt = stmt.where(FolderACL.is_inherited == is_inherited)
         if is_active is None:
-            query = query.filter(FolderACL.is_active.is_(True))
+            stmt = stmt.where(FolderACL.is_active.is_(True))
         else:
-            query = query.filter(FolderACL.is_active == is_active)
-        query = apply_ordering(
-            query,
+            stmt = stmt.where(FolderACL.is_active == is_active)
+        stmt = apply_ordering(
+            stmt,
             order_by,
             order_dir,
             {"created_at": FolderACL.created_at},
         )
-        return apply_pagination(query, limit, offset).all()
+        return db.scalars(apply_pagination(stmt, limit, offset)).all()
 
     @staticmethod
     def update(db: Session, acl_id: str, payload: FolderACLUpdate) -> FolderACL:
@@ -279,7 +278,7 @@ class FolderACLs(ListResponseMixin):
             _validate_grantor(db, str(data["granted_by"]))
         for key, value in data.items():
             setattr(acl, key, value)
-        db.commit()
+        db.flush()
         db.refresh(acl)
         logger.info("Updated folder ACL %s", acl.id)
         return acl
@@ -290,7 +289,7 @@ class FolderACLs(ListResponseMixin):
         if not acl:
             raise HTTPException(status_code=404, detail="Folder ACL not found")
         acl.is_active = False
-        db.commit()
+        db.flush()
         logger.info("Soft-deleted folder ACL %s", acl_id)
         publish_event(
             EventType.acl_revoked,

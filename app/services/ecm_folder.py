@@ -1,6 +1,7 @@
 import logging
 
 from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.ecm import Folder
@@ -31,7 +32,7 @@ class Folders(ListResponseMixin):
         folder.path = Folders._compute_path(db, folder)
         folder.depth = Folders._compute_depth(folder.path)
 
-        db.commit()
+        db.flush()
         db.refresh(folder)
         logger.info("Created folder %s", folder.id)
         return folder
@@ -53,20 +54,20 @@ class Folders(ListResponseMixin):
         limit: int,
         offset: int,
     ) -> list[Folder]:
-        query = db.query(Folder)
+        stmt = select(Folder)
         if parent_id is not None:
-            query = query.filter(Folder.parent_id == coerce_uuid(parent_id))
+            stmt = stmt.where(Folder.parent_id == coerce_uuid(parent_id))
         if is_active is None:
-            query = query.filter(Folder.is_active.is_(True))
+            stmt = stmt.where(Folder.is_active.is_(True))
         else:
-            query = query.filter(Folder.is_active == is_active)
-        query = apply_ordering(
-            query,
+            stmt = stmt.where(Folder.is_active == is_active)
+        stmt = apply_ordering(
+            stmt,
             order_by,
             order_dir,
             {"name": Folder.name, "created_at": Folder.created_at},
         )
-        return apply_pagination(query, limit, offset).all()
+        return db.scalars(apply_pagination(stmt, limit, offset)).all()
 
     @staticmethod
     def update(db: Session, folder_id: str, payload: FolderUpdate) -> Folder:
@@ -95,7 +96,7 @@ class Folders(ListResponseMixin):
             if parent_changed:
                 Folders._recompute_subtree_paths(db, folder, old_path)
 
-        db.commit()
+        db.flush()
         db.refresh(folder)
         logger.info("Updated folder %s", folder.id)
         return folder
@@ -106,7 +107,7 @@ class Folders(ListResponseMixin):
         if not folder:
             raise HTTPException(status_code=404, detail="Folder not found")
         folder.is_active = False
-        db.commit()
+        db.flush()
         logger.info("Soft-deleted folder %s", folder.id)
 
     @staticmethod
@@ -124,7 +125,9 @@ class Folders(ListResponseMixin):
 
     @staticmethod
     def _recompute_subtree_paths(db: Session, folder: Folder, old_path: str) -> None:
-        descendants = db.query(Folder).filter(Folder.path.like(f"{old_path}/%")).all()
+        descendants = db.scalars(
+            select(Folder).where(Folder.path.like(f"{old_path}/%"))
+        ).all()
         for child in descendants:
             child.path = folder.path + child.path[len(old_path) :]
             child.depth = Folders._compute_depth(child.path)

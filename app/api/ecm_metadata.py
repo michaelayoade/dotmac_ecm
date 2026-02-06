@@ -1,3 +1,5 @@
+from collections.abc import Generator
+
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
@@ -23,10 +25,14 @@ from app.services import ecm_metadata as meta_service
 router = APIRouter(prefix="/ecm", tags=["ecm-metadata"])
 
 
-def get_db():
+def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
         yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 
@@ -41,12 +47,16 @@ def get_db():
     response_model=ContentTypeRead,
     status_code=status.HTTP_201_CREATED,
 )
-def create_content_type(payload: ContentTypeCreate, db: Session = Depends(get_db)):
+def create_content_type(
+    payload: ContentTypeCreate, db: Session = Depends(get_db)
+) -> ContentTypeRead:
     return meta_service.content_types.create(db, payload)
 
 
 @router.get("/content-types/{content_type_id}", response_model=ContentTypeRead)
-def get_content_type(content_type_id: str, db: Session = Depends(get_db)):
+def get_content_type(
+    content_type_id: str, db: Session = Depends(get_db)
+) -> ContentTypeRead:
     return meta_service.content_types.get(db, content_type_id)
 
 
@@ -58,7 +68,7 @@ def list_content_types(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-):
+) -> dict:
     return meta_service.content_types.list_response(
         db, is_active, order_by, order_dir, limit, offset
     )
@@ -69,14 +79,14 @@ def update_content_type(
     content_type_id: str,
     payload: ContentTypeUpdate,
     db: Session = Depends(get_db),
-):
+) -> ContentTypeRead:
     return meta_service.content_types.update(db, content_type_id, payload)
 
 
 @router.delete(
     "/content-types/{content_type_id}", status_code=status.HTTP_204_NO_CONTENT
 )
-def delete_content_type(content_type_id: str, db: Session = Depends(get_db)):
+def delete_content_type(content_type_id: str, db: Session = Depends(get_db)) -> None:
     meta_service.content_types.delete(db, content_type_id)
 
 
@@ -86,12 +96,12 @@ def delete_content_type(content_type_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/tags", response_model=TagRead, status_code=status.HTTP_201_CREATED)
-def create_tag(payload: TagCreate, db: Session = Depends(get_db)):
+def create_tag(payload: TagCreate, db: Session = Depends(get_db)) -> TagRead:
     return meta_service.tags.create(db, payload)
 
 
 @router.get("/tags/{tag_id}", response_model=TagRead)
-def get_tag(tag_id: str, db: Session = Depends(get_db)):
+def get_tag(tag_id: str, db: Session = Depends(get_db)) -> TagRead:
     return meta_service.tags.get(db, tag_id)
 
 
@@ -103,19 +113,21 @@ def list_tags(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-):
+) -> dict:
     return meta_service.tags.list_response(
         db, is_active, order_by, order_dir, limit, offset
     )
 
 
 @router.patch("/tags/{tag_id}", response_model=TagRead)
-def update_tag(tag_id: str, payload: TagUpdate, db: Session = Depends(get_db)):
+def update_tag(
+    tag_id: str, payload: TagUpdate, db: Session = Depends(get_db)
+) -> TagRead:
     return meta_service.tags.update(db, tag_id, payload)
 
 
 @router.delete("/tags/{tag_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_tag(tag_id: str, db: Session = Depends(get_db)):
+def delete_tag(tag_id: str, db: Session = Depends(get_db)) -> None:
     meta_service.tags.delete(db, tag_id)
 
 
@@ -129,12 +141,14 @@ def delete_tag(tag_id: str, db: Session = Depends(get_db)):
     response_model=DocumentTagRead,
     status_code=status.HTTP_201_CREATED,
 )
-def create_document_tag(payload: DocumentTagCreate, db: Session = Depends(get_db)):
+def create_document_tag(
+    payload: DocumentTagCreate, db: Session = Depends(get_db)
+) -> DocumentTagRead:
     return meta_service.document_tags.create(db, payload)
 
 
 @router.get("/document-tags/{link_id}", response_model=DocumentTagRead)
-def get_document_tag(link_id: str, db: Session = Depends(get_db)):
+def get_document_tag(link_id: str, db: Session = Depends(get_db)) -> DocumentTagRead:
     return meta_service.document_tags.get(db, link_id)
 
 
@@ -147,14 +161,14 @@ def list_document_tags(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-):
+) -> dict:
     return meta_service.document_tags.list_response(
         db, document_id, tag_id, order_by, order_dir, limit, offset
     )
 
 
 @router.delete("/document-tags/{link_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_document_tag(link_id: str, db: Session = Depends(get_db)):
+def delete_document_tag(link_id: str, db: Session = Depends(get_db)) -> None:
     meta_service.document_tags.delete(db, link_id)
 
 
@@ -168,12 +182,14 @@ def delete_document_tag(link_id: str, db: Session = Depends(get_db)):
     response_model=CategoryRead,
     status_code=status.HTTP_201_CREATED,
 )
-def create_category(payload: CategoryCreate, db: Session = Depends(get_db)):
+def create_category(
+    payload: CategoryCreate, db: Session = Depends(get_db)
+) -> CategoryRead:
     return meta_service.categories.create(db, payload)
 
 
 @router.get("/categories/{category_id}", response_model=CategoryRead)
-def get_category(category_id: str, db: Session = Depends(get_db)):
+def get_category(category_id: str, db: Session = Depends(get_db)) -> CategoryRead:
     return meta_service.categories.get(db, category_id)
 
 
@@ -186,7 +202,7 @@ def list_categories(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-):
+) -> dict:
     return meta_service.categories.list_response(
         db, parent_id, is_active, order_by, order_dir, limit, offset
     )
@@ -195,12 +211,12 @@ def list_categories(
 @router.patch("/categories/{category_id}", response_model=CategoryRead)
 def update_category(
     category_id: str, payload: CategoryUpdate, db: Session = Depends(get_db)
-):
+) -> CategoryRead:
     return meta_service.categories.update(db, category_id, payload)
 
 
 @router.delete("/categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_category(category_id: str, db: Session = Depends(get_db)):
+def delete_category(category_id: str, db: Session = Depends(get_db)) -> None:
     meta_service.categories.delete(db, category_id)
 
 
@@ -216,12 +232,14 @@ def delete_category(category_id: str, db: Session = Depends(get_db)):
 )
 def create_document_category(
     payload: DocumentCategoryCreate, db: Session = Depends(get_db)
-):
+) -> DocumentCategoryRead:
     return meta_service.document_categories.create(db, payload)
 
 
 @router.get("/document-categories/{link_id}", response_model=DocumentCategoryRead)
-def get_document_category(link_id: str, db: Session = Depends(get_db)):
+def get_document_category(
+    link_id: str, db: Session = Depends(get_db)
+) -> DocumentCategoryRead:
     return meta_service.document_categories.get(db, link_id)
 
 
@@ -234,12 +252,12 @@ def list_document_categories(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-):
+) -> dict:
     return meta_service.document_categories.list_response(
         db, document_id, category_id, order_by, order_dir, limit, offset
     )
 
 
 @router.delete("/document-categories/{link_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_document_category(link_id: str, db: Session = Depends(get_db)):
+def delete_document_category(link_id: str, db: Session = Depends(get_db)) -> None:
     meta_service.document_categories.delete(db, link_id)

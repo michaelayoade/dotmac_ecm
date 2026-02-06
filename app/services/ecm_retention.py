@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.ecm import (
@@ -67,7 +68,7 @@ class RetentionPolicies(ListResponseMixin):
         data["disposition_action"] = DispositionAction(data["disposition_action"])
         policy = RetentionPolicy(**data)
         db.add(policy)
-        db.commit()
+        db.flush()
         db.refresh(policy)
         logger.info("Created retention policy %s", policy.id)
         return policy
@@ -91,26 +92,24 @@ class RetentionPolicies(ListResponseMixin):
         limit: int,
         offset: int,
     ) -> list[RetentionPolicy]:
-        query = db.query(RetentionPolicy)
+        stmt = select(RetentionPolicy)
         if disposition_action is not None:
-            query = query.filter(
+            stmt = stmt.where(
                 RetentionPolicy.disposition_action
                 == DispositionAction(disposition_action)
             )
         if content_type_id is not None:
-            query = query.filter(
+            stmt = stmt.where(
                 RetentionPolicy.content_type_id == coerce_uuid(content_type_id)
             )
         if category_id is not None:
-            query = query.filter(
-                RetentionPolicy.category_id == coerce_uuid(category_id)
-            )
+            stmt = stmt.where(RetentionPolicy.category_id == coerce_uuid(category_id))
         if is_active is None:
-            query = query.filter(RetentionPolicy.is_active.is_(True))
+            stmt = stmt.where(RetentionPolicy.is_active.is_(True))
         else:
-            query = query.filter(RetentionPolicy.is_active == is_active)
-        query = apply_ordering(
-            query,
+            stmt = stmt.where(RetentionPolicy.is_active == is_active)
+        stmt = apply_ordering(
+            stmt,
             order_by,
             order_dir,
             {
@@ -118,7 +117,7 @@ class RetentionPolicies(ListResponseMixin):
                 "created_at": RetentionPolicy.created_at,
             },
         )
-        return apply_pagination(query, limit, offset).all()
+        return db.scalars(apply_pagination(stmt, limit, offset)).all()
 
     @staticmethod
     def update(
@@ -141,7 +140,7 @@ class RetentionPolicies(ListResponseMixin):
                 raise HTTPException(status_code=404, detail="Category not found")
         for key, value in data.items():
             setattr(policy, key, value)
-        db.commit()
+        db.flush()
         db.refresh(policy)
         logger.info("Updated retention policy %s", policy.id)
         return policy
@@ -152,7 +151,7 @@ class RetentionPolicies(ListResponseMixin):
         if not policy:
             raise HTTPException(status_code=404, detail="Retention policy not found")
         policy.is_active = False
-        db.commit()
+        db.flush()
         logger.info("Soft-deleted retention policy %s", policy_id)
 
 
@@ -174,7 +173,7 @@ class DocumentRetentions(ListResponseMixin):
         data["disposition_status"] = DispositionStatus(data["disposition_status"])
         retention = DocumentRetention(**data)
         db.add(retention)
-        db.commit()
+        db.flush()
         db.refresh(retention)
         logger.info("Created document retention %s", retention.id)
         publish_event(
@@ -204,24 +203,22 @@ class DocumentRetentions(ListResponseMixin):
         limit: int,
         offset: int,
     ) -> list[DocumentRetention]:
-        query = db.query(DocumentRetention)
+        stmt = select(DocumentRetention)
         if document_id is not None:
-            query = query.filter(
-                DocumentRetention.document_id == coerce_uuid(document_id)
-            )
+            stmt = stmt.where(DocumentRetention.document_id == coerce_uuid(document_id))
         if policy_id is not None:
-            query = query.filter(DocumentRetention.policy_id == coerce_uuid(policy_id))
+            stmt = stmt.where(DocumentRetention.policy_id == coerce_uuid(policy_id))
         if disposition_status is not None:
-            query = query.filter(
+            stmt = stmt.where(
                 DocumentRetention.disposition_status
                 == DispositionStatus(disposition_status)
             )
         if is_active is None:
-            query = query.filter(DocumentRetention.is_active.is_(True))
+            stmt = stmt.where(DocumentRetention.is_active.is_(True))
         else:
-            query = query.filter(DocumentRetention.is_active == is_active)
-        query = apply_ordering(
-            query,
+            stmt = stmt.where(DocumentRetention.is_active == is_active)
+        stmt = apply_ordering(
+            stmt,
             order_by,
             order_dir,
             {
@@ -229,7 +226,7 @@ class DocumentRetentions(ListResponseMixin):
                 "retention_expires_at": DocumentRetention.retention_expires_at,
             },
         )
-        return apply_pagination(query, limit, offset).all()
+        return db.scalars(apply_pagination(stmt, limit, offset)).all()
 
     @staticmethod
     def update(
@@ -246,7 +243,7 @@ class DocumentRetentions(ListResponseMixin):
             data["disposition_status"] = DispositionStatus(data["disposition_status"])
         for key, value in data.items():
             setattr(retention, key, value)
-        db.commit()
+        db.flush()
         db.refresh(retention)
         logger.info("Updated document retention %s", retention.id)
         return retention
@@ -257,7 +254,7 @@ class DocumentRetentions(ListResponseMixin):
         if not retention:
             raise HTTPException(status_code=404, detail="Document retention not found")
         retention.is_active = False
-        db.commit()
+        db.flush()
         logger.info("Soft-deleted document retention %s", retention_id)
 
     @staticmethod
@@ -272,7 +269,7 @@ class DocumentRetentions(ListResponseMixin):
         retention.disposition_status = DispositionStatus.completed
         retention.disposed_at = datetime.now(timezone.utc)
         retention.disposed_by = coerce_uuid(disposed_by)
-        db.commit()
+        db.flush()
         db.refresh(retention)
         logger.info("Disposed document retention %s", retention.id)
         publish_event(

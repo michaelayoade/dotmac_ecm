@@ -1,3 +1,5 @@
+from collections.abc import Generator
+
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
@@ -20,10 +22,14 @@ from app.services import ecm_workflow as wf_service
 router = APIRouter(prefix="/ecm", tags=["ecm-workflows"])
 
 
-def get_db():
+def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
         yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 
@@ -40,7 +46,7 @@ def get_db():
 )
 def create_workflow_definition(
     payload: WorkflowDefinitionCreate, db: Session = Depends(get_db)
-):
+) -> WorkflowDefinitionRead:
     return wf_service.workflow_definitions.create(db, payload)
 
 
@@ -48,7 +54,9 @@ def create_workflow_definition(
     "/workflow-definitions/{definition_id}",
     response_model=WorkflowDefinitionRead,
 )
-def get_workflow_definition(definition_id: str, db: Session = Depends(get_db)):
+def get_workflow_definition(
+    definition_id: str, db: Session = Depends(get_db)
+) -> WorkflowDefinitionRead:
     return wf_service.workflow_definitions.get(db, definition_id)
 
 
@@ -63,7 +71,7 @@ def list_workflow_definitions(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-):
+) -> dict:
     return wf_service.workflow_definitions.list_response(
         db, is_active, order_by, order_dir, limit, offset
     )
@@ -77,7 +85,7 @@ def update_workflow_definition(
     definition_id: str,
     payload: WorkflowDefinitionUpdate,
     db: Session = Depends(get_db),
-):
+) -> WorkflowDefinitionRead:
     return wf_service.workflow_definitions.update(db, definition_id, payload)
 
 
@@ -85,7 +93,9 @@ def update_workflow_definition(
     "/workflow-definitions/{definition_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
-def delete_workflow_definition(definition_id: str, db: Session = Depends(get_db)):
+def delete_workflow_definition(
+    definition_id: str, db: Session = Depends(get_db)
+) -> None:
     wf_service.workflow_definitions.delete(db, definition_id)
 
 
@@ -101,7 +111,7 @@ def delete_workflow_definition(definition_id: str, db: Session = Depends(get_db)
 )
 def create_workflow_instance(
     payload: WorkflowInstanceCreate, db: Session = Depends(get_db)
-):
+) -> WorkflowInstanceRead:
     return wf_service.workflow_instances.create(db, payload)
 
 
@@ -109,7 +119,9 @@ def create_workflow_instance(
     "/workflow-instances/{instance_id}",
     response_model=WorkflowInstanceRead,
 )
-def get_workflow_instance(instance_id: str, db: Session = Depends(get_db)):
+def get_workflow_instance(
+    instance_id: str, db: Session = Depends(get_db)
+) -> WorkflowInstanceRead:
     return wf_service.workflow_instances.get(db, instance_id)
 
 
@@ -128,7 +140,7 @@ def list_workflow_instances(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-):
+) -> dict:
     return wf_service.workflow_instances.list_response(
         db,
         definition_id,
@@ -151,7 +163,7 @@ def update_workflow_instance(
     instance_id: str,
     payload: WorkflowInstanceUpdate,
     db: Session = Depends(get_db),
-):
+) -> WorkflowInstanceRead:
     return wf_service.workflow_instances.update(db, instance_id, payload)
 
 
@@ -159,7 +171,7 @@ def update_workflow_instance(
     "/workflow-instances/{instance_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
-def delete_workflow_instance(instance_id: str, db: Session = Depends(get_db)):
+def delete_workflow_instance(instance_id: str, db: Session = Depends(get_db)) -> None:
     wf_service.workflow_instances.delete(db, instance_id)
 
 
@@ -173,7 +185,9 @@ def delete_workflow_instance(instance_id: str, db: Session = Depends(get_db)):
     response_model=WorkflowTaskRead,
     status_code=status.HTTP_201_CREATED,
 )
-def create_workflow_task(payload: WorkflowTaskCreate, db: Session = Depends(get_db)):
+def create_workflow_task(
+    payload: WorkflowTaskCreate, db: Session = Depends(get_db)
+) -> WorkflowTaskRead:
     return wf_service.workflow_tasks.create(db, payload)
 
 
@@ -181,7 +195,7 @@ def create_workflow_task(payload: WorkflowTaskCreate, db: Session = Depends(get_
     "/workflow-tasks/{task_id}",
     response_model=WorkflowTaskRead,
 )
-def get_workflow_task(task_id: str, db: Session = Depends(get_db)):
+def get_workflow_task(task_id: str, db: Session = Depends(get_db)) -> WorkflowTaskRead:
     return wf_service.workflow_tasks.get(db, task_id)
 
 
@@ -200,7 +214,7 @@ def list_workflow_tasks(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-):
+) -> dict:
     return wf_service.workflow_tasks.list_response(
         db,
         instance_id,
@@ -223,7 +237,7 @@ def update_workflow_task(
     task_id: str,
     payload: WorkflowTaskUpdate,
     db: Session = Depends(get_db),
-):
+) -> WorkflowTaskRead:
     return wf_service.workflow_tasks.update(db, task_id, payload)
 
 
@@ -231,7 +245,7 @@ def update_workflow_task(
     "/workflow-tasks/{task_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
-def delete_workflow_task(task_id: str, db: Session = Depends(get_db)):
+def delete_workflow_task(task_id: str, db: Session = Depends(get_db)) -> None:
     wf_service.workflow_tasks.delete(db, task_id)
 
 
@@ -243,7 +257,7 @@ def complete_workflow_task(
     task_id: str,
     payload: WorkflowTaskCompleteRequest,
     db: Session = Depends(get_db),
-):
+) -> WorkflowTaskRead:
     return wf_service.workflow_tasks.complete(
         db, task_id, payload.status, payload.decision_comment
     )

@@ -1,6 +1,7 @@
 import logging
 
 from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.ecm import (
@@ -40,7 +41,7 @@ class ContentTypes(ListResponseMixin):
             data["schema"] = data.pop("schema_")
         ct = ContentType(**data)
         db.add(ct)
-        db.commit()
+        db.flush()
         db.refresh(ct)
         logger.info("Created content type %s", ct.id)
         return ct
@@ -61,18 +62,18 @@ class ContentTypes(ListResponseMixin):
         limit: int,
         offset: int,
     ) -> list[ContentType]:
-        query = db.query(ContentType)
+        stmt = select(ContentType)
         if is_active is None:
-            query = query.filter(ContentType.is_active.is_(True))
+            stmt = stmt.where(ContentType.is_active.is_(True))
         else:
-            query = query.filter(ContentType.is_active == is_active)
-        query = apply_ordering(
-            query,
+            stmt = stmt.where(ContentType.is_active == is_active)
+        stmt = apply_ordering(
+            stmt,
             order_by,
             order_dir,
             {"name": ContentType.name, "created_at": ContentType.created_at},
         )
-        return apply_pagination(query, limit, offset).all()
+        return db.scalars(apply_pagination(stmt, limit, offset)).all()
 
     @staticmethod
     def update(
@@ -86,7 +87,7 @@ class ContentTypes(ListResponseMixin):
             data["schema"] = data.pop("schema_")
         for key, value in data.items():
             setattr(ct, key, value)
-        db.commit()
+        db.flush()
         db.refresh(ct)
         logger.info("Updated content type %s", ct.id)
         return ct
@@ -97,7 +98,7 @@ class ContentTypes(ListResponseMixin):
         if not ct:
             raise HTTPException(status_code=404, detail="Content type not found")
         ct.is_active = False
-        db.commit()
+        db.flush()
         logger.info("Soft-deleted content type %s", content_type_id)
 
 
@@ -111,7 +112,7 @@ class Tags(ListResponseMixin):
     def create(db: Session, payload: TagCreate) -> Tag:
         tag = Tag(**payload.model_dump())
         db.add(tag)
-        db.commit()
+        db.flush()
         db.refresh(tag)
         logger.info("Created tag %s", tag.id)
         return tag
@@ -132,18 +133,18 @@ class Tags(ListResponseMixin):
         limit: int,
         offset: int,
     ) -> list[Tag]:
-        query = db.query(Tag)
+        stmt = select(Tag)
         if is_active is None:
-            query = query.filter(Tag.is_active.is_(True))
+            stmt = stmt.where(Tag.is_active.is_(True))
         else:
-            query = query.filter(Tag.is_active == is_active)
-        query = apply_ordering(
-            query,
+            stmt = stmt.where(Tag.is_active == is_active)
+        stmt = apply_ordering(
+            stmt,
             order_by,
             order_dir,
             {"name": Tag.name, "created_at": Tag.created_at},
         )
-        return apply_pagination(query, limit, offset).all()
+        return db.scalars(apply_pagination(stmt, limit, offset)).all()
 
     @staticmethod
     def update(db: Session, tag_id: str, payload: TagUpdate) -> Tag:
@@ -152,7 +153,7 @@ class Tags(ListResponseMixin):
             raise HTTPException(status_code=404, detail="Tag not found")
         for key, value in payload.model_dump(exclude_unset=True).items():
             setattr(tag, key, value)
-        db.commit()
+        db.flush()
         db.refresh(tag)
         logger.info("Updated tag %s", tag.id)
         return tag
@@ -163,7 +164,7 @@ class Tags(ListResponseMixin):
         if not tag:
             raise HTTPException(status_code=404, detail="Tag not found")
         tag.is_active = False
-        db.commit()
+        db.flush()
         logger.info("Soft-deleted tag %s", tag_id)
 
 
@@ -183,7 +184,7 @@ class DocumentTags(ListResponseMixin):
             raise HTTPException(status_code=404, detail="Tag not found")
         link = DocumentTag(**payload.model_dump())
         db.add(link)
-        db.commit()
+        db.flush()
         db.refresh(link)
         logger.info("Created document-tag link %s", link.id)
         return link
@@ -205,18 +206,18 @@ class DocumentTags(ListResponseMixin):
         limit: int,
         offset: int,
     ) -> list[DocumentTag]:
-        query = db.query(DocumentTag)
+        stmt = select(DocumentTag)
         if document_id is not None:
-            query = query.filter(DocumentTag.document_id == coerce_uuid(document_id))
+            stmt = stmt.where(DocumentTag.document_id == coerce_uuid(document_id))
         if tag_id is not None:
-            query = query.filter(DocumentTag.tag_id == coerce_uuid(tag_id))
-        query = apply_ordering(
-            query,
+            stmt = stmt.where(DocumentTag.tag_id == coerce_uuid(tag_id))
+        stmt = apply_ordering(
+            stmt,
             order_by,
             order_dir,
             {"document_id": DocumentTag.document_id},
         )
-        return apply_pagination(query, limit, offset).all()
+        return db.scalars(apply_pagination(stmt, limit, offset)).all()
 
     @staticmethod
     def delete(db: Session, link_id: str) -> None:
@@ -224,7 +225,7 @@ class DocumentTags(ListResponseMixin):
         if not link:
             raise HTTPException(status_code=404, detail="Document tag not found")
         db.delete(link)
-        db.commit()
+        db.flush()
         logger.info("Deleted document-tag link %s", link_id)
 
 
@@ -248,7 +249,7 @@ class Categories(ListResponseMixin):
         category.path = Categories._compute_path(db, category)
         category.depth = Categories._compute_depth(category.path)
 
-        db.commit()
+        db.flush()
         db.refresh(category)
         logger.info("Created category %s", category.id)
         return category
@@ -270,20 +271,20 @@ class Categories(ListResponseMixin):
         limit: int,
         offset: int,
     ) -> list[Category]:
-        query = db.query(Category)
+        stmt = select(Category)
         if parent_id is not None:
-            query = query.filter(Category.parent_id == coerce_uuid(parent_id))
+            stmt = stmt.where(Category.parent_id == coerce_uuid(parent_id))
         if is_active is None:
-            query = query.filter(Category.is_active.is_(True))
+            stmt = stmt.where(Category.is_active.is_(True))
         else:
-            query = query.filter(Category.is_active == is_active)
-        query = apply_ordering(
-            query,
+            stmt = stmt.where(Category.is_active == is_active)
+        stmt = apply_ordering(
+            stmt,
             order_by,
             order_dir,
             {"name": Category.name, "created_at": Category.created_at},
         )
-        return apply_pagination(query, limit, offset).all()
+        return db.scalars(apply_pagination(stmt, limit, offset)).all()
 
     @staticmethod
     def update(db: Session, category_id: str, payload: CategoryUpdate) -> Category:
@@ -312,7 +313,7 @@ class Categories(ListResponseMixin):
             if parent_changed:
                 Categories._recompute_subtree_paths(db, category, old_path)
 
-        db.commit()
+        db.flush()
         db.refresh(category)
         logger.info("Updated category %s", category.id)
         return category
@@ -323,7 +324,7 @@ class Categories(ListResponseMixin):
         if not category:
             raise HTTPException(status_code=404, detail="Category not found")
         category.is_active = False
-        db.commit()
+        db.flush()
         logger.info("Soft-deleted category %s", category_id)
 
     @staticmethod
@@ -343,9 +344,9 @@ class Categories(ListResponseMixin):
     def _recompute_subtree_paths(
         db: Session, category: Category, old_path: str
     ) -> None:
-        descendants = (
-            db.query(Category).filter(Category.path.like(f"{old_path}/%")).all()
-        )
+        descendants = db.scalars(
+            select(Category).where(Category.path.like(f"{old_path}/%"))
+        ).all()
         for child in descendants:
             child.path = category.path + child.path[len(old_path) :]
             child.depth = Categories._compute_depth(child.path)
@@ -367,7 +368,7 @@ class DocumentCategories(ListResponseMixin):
             raise HTTPException(status_code=404, detail="Category not found")
         link = DocumentCategory(**payload.model_dump())
         db.add(link)
-        db.commit()
+        db.flush()
         db.refresh(link)
         logger.info("Created document-category link %s", link.id)
         return link
@@ -389,22 +390,18 @@ class DocumentCategories(ListResponseMixin):
         limit: int,
         offset: int,
     ) -> list[DocumentCategory]:
-        query = db.query(DocumentCategory)
+        stmt = select(DocumentCategory)
         if document_id is not None:
-            query = query.filter(
-                DocumentCategory.document_id == coerce_uuid(document_id)
-            )
+            stmt = stmt.where(DocumentCategory.document_id == coerce_uuid(document_id))
         if category_id is not None:
-            query = query.filter(
-                DocumentCategory.category_id == coerce_uuid(category_id)
-            )
-        query = apply_ordering(
-            query,
+            stmt = stmt.where(DocumentCategory.category_id == coerce_uuid(category_id))
+        stmt = apply_ordering(
+            stmt,
             order_by,
             order_dir,
             {"document_id": DocumentCategory.document_id},
         )
-        return apply_pagination(query, limit, offset).all()
+        return db.scalars(apply_pagination(stmt, limit, offset)).all()
 
     @staticmethod
     def delete(db: Session, link_id: str) -> None:
@@ -412,7 +409,7 @@ class DocumentCategories(ListResponseMixin):
         if not link:
             raise HTTPException(status_code=404, detail="Document category not found")
         db.delete(link)
-        db.commit()
+        db.flush()
         logger.info("Deleted document-category link %s", link_id)
 
 

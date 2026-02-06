@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.ecm import (
@@ -70,7 +71,7 @@ class WorkflowDefinitions(ListResponseMixin):
         data = payload.model_dump()
         defn = WorkflowDefinition(**data)
         db.add(defn)
-        db.commit()
+        db.flush()
         db.refresh(defn)
         logger.info("Created workflow definition %s", defn.id)
         return defn
@@ -91,13 +92,13 @@ class WorkflowDefinitions(ListResponseMixin):
         limit: int,
         offset: int,
     ) -> list[WorkflowDefinition]:
-        query = db.query(WorkflowDefinition)
+        stmt = select(WorkflowDefinition)
         if is_active is None:
-            query = query.filter(WorkflowDefinition.is_active.is_(True))
+            stmt = stmt.where(WorkflowDefinition.is_active.is_(True))
         else:
-            query = query.filter(WorkflowDefinition.is_active == is_active)
-        query = apply_ordering(
-            query,
+            stmt = stmt.where(WorkflowDefinition.is_active == is_active)
+        stmt = apply_ordering(
+            stmt,
             order_by,
             order_dir,
             {
@@ -105,7 +106,7 @@ class WorkflowDefinitions(ListResponseMixin):
                 "created_at": WorkflowDefinition.created_at,
             },
         )
-        return apply_pagination(query, limit, offset).all()
+        return db.scalars(apply_pagination(stmt, limit, offset)).all()
 
     @staticmethod
     def update(
@@ -119,7 +120,7 @@ class WorkflowDefinitions(ListResponseMixin):
         data = payload.model_dump(exclude_unset=True)
         for key, value in data.items():
             setattr(defn, key, value)
-        db.commit()
+        db.flush()
         db.refresh(defn)
         logger.info("Updated workflow definition %s", defn.id)
         return defn
@@ -130,7 +131,7 @@ class WorkflowDefinitions(ListResponseMixin):
         if not defn:
             raise HTTPException(status_code=404, detail="Workflow definition not found")
         defn.is_active = False
-        db.commit()
+        db.flush()
         logger.info("Soft-deleted workflow definition %s", definition_id)
 
 
@@ -155,7 +156,7 @@ class WorkflowInstances(ListResponseMixin):
         data["status"] = WorkflowInstanceStatus(data["status"])
         instance = WorkflowInstance(**data)
         db.add(instance)
-        db.commit()
+        db.flush()
         db.refresh(instance)
         logger.info("Created workflow instance %s", instance.id)
         publish_event(
@@ -187,32 +188,28 @@ class WorkflowInstances(ListResponseMixin):
         limit: int,
         offset: int,
     ) -> list[WorkflowInstance]:
-        query = db.query(WorkflowInstance)
+        stmt = select(WorkflowInstance)
         if definition_id is not None:
-            query = query.filter(
+            stmt = stmt.where(
                 WorkflowInstance.definition_id == coerce_uuid(definition_id)
             )
         if document_id is not None:
-            query = query.filter(
-                WorkflowInstance.document_id == coerce_uuid(document_id)
-            )
+            stmt = stmt.where(WorkflowInstance.document_id == coerce_uuid(document_id))
         if status is not None:
-            query = query.filter(
-                WorkflowInstance.status == WorkflowInstanceStatus(status)
-            )
+            stmt = stmt.where(WorkflowInstance.status == WorkflowInstanceStatus(status))
         if started_by is not None:
-            query = query.filter(WorkflowInstance.started_by == coerce_uuid(started_by))
+            stmt = stmt.where(WorkflowInstance.started_by == coerce_uuid(started_by))
         if is_active is None:
-            query = query.filter(WorkflowInstance.is_active.is_(True))
+            stmt = stmt.where(WorkflowInstance.is_active.is_(True))
         else:
-            query = query.filter(WorkflowInstance.is_active == is_active)
-        query = apply_ordering(
-            query,
+            stmt = stmt.where(WorkflowInstance.is_active == is_active)
+        stmt = apply_ordering(
+            stmt,
             order_by,
             order_dir,
             {"created_at": WorkflowInstance.created_at},
         )
-        return apply_pagination(query, limit, offset).all()
+        return db.scalars(apply_pagination(stmt, limit, offset)).all()
 
     @staticmethod
     def update(
@@ -229,7 +226,7 @@ class WorkflowInstances(ListResponseMixin):
             data["status"] = WorkflowInstanceStatus(data["status"])
         for key, value in data.items():
             setattr(instance, key, value)
-        db.commit()
+        db.flush()
         db.refresh(instance)
         logger.info("Updated workflow instance %s", instance.id)
         if instance.status == WorkflowInstanceStatus.completed:
@@ -254,7 +251,7 @@ class WorkflowInstances(ListResponseMixin):
         if not instance:
             raise HTTPException(status_code=404, detail="Workflow instance not found")
         instance.is_active = False
-        db.commit()
+        db.flush()
         logger.info("Soft-deleted workflow instance %s", instance_id)
 
 
@@ -276,7 +273,7 @@ class WorkflowTasks(ListResponseMixin):
         data["task_type"] = WorkflowTaskType(data["task_type"])
         task = WorkflowTask(**data)
         db.add(task)
-        db.commit()
+        db.flush()
         db.refresh(task)
         logger.info("Created workflow task %s", task.id)
         publish_event(
@@ -307,26 +304,26 @@ class WorkflowTasks(ListResponseMixin):
         limit: int,
         offset: int,
     ) -> list[WorkflowTask]:
-        query = db.query(WorkflowTask)
+        stmt = select(WorkflowTask)
         if instance_id is not None:
-            query = query.filter(WorkflowTask.instance_id == coerce_uuid(instance_id))
+            stmt = stmt.where(WorkflowTask.instance_id == coerce_uuid(instance_id))
         if assignee_id is not None:
-            query = query.filter(WorkflowTask.assignee_id == coerce_uuid(assignee_id))
+            stmt = stmt.where(WorkflowTask.assignee_id == coerce_uuid(assignee_id))
         if status is not None:
-            query = query.filter(WorkflowTask.status == WorkflowTaskStatus(status))
+            stmt = stmt.where(WorkflowTask.status == WorkflowTaskStatus(status))
         if task_type is not None:
-            query = query.filter(WorkflowTask.task_type == WorkflowTaskType(task_type))
+            stmt = stmt.where(WorkflowTask.task_type == WorkflowTaskType(task_type))
         if is_active is None:
-            query = query.filter(WorkflowTask.is_active.is_(True))
+            stmt = stmt.where(WorkflowTask.is_active.is_(True))
         else:
-            query = query.filter(WorkflowTask.is_active == is_active)
-        query = apply_ordering(
-            query,
+            stmt = stmt.where(WorkflowTask.is_active == is_active)
+        stmt = apply_ordering(
+            stmt,
             order_by,
             order_dir,
             {"created_at": WorkflowTask.created_at},
         )
-        return apply_pagination(query, limit, offset).all()
+        return db.scalars(apply_pagination(stmt, limit, offset)).all()
 
     @staticmethod
     def update(db: Session, task_id: str, payload: WorkflowTaskUpdate) -> WorkflowTask:
@@ -339,7 +336,7 @@ class WorkflowTasks(ListResponseMixin):
             data["status"] = WorkflowTaskStatus(data["status"])
         for key, value in data.items():
             setattr(task, key, value)
-        db.commit()
+        db.flush()
         db.refresh(task)
         logger.info("Updated workflow task %s", task.id)
         return task
@@ -350,7 +347,7 @@ class WorkflowTasks(ListResponseMixin):
         if not task:
             raise HTTPException(status_code=404, detail="Workflow task not found")
         task.is_active = False
-        db.commit()
+        db.flush()
         logger.info("Soft-deleted workflow task %s", task_id)
 
     @staticmethod
@@ -373,7 +370,7 @@ class WorkflowTasks(ListResponseMixin):
         task.status = WorkflowTaskStatus(status)
         task.decision_comment = decision_comment
         task.decided_at = datetime.now(timezone.utc)
-        db.commit()
+        db.flush()
         db.refresh(task)
         logger.info("Completed workflow task %s with status %s", task.id, status)
         publish_event(

@@ -1,3 +1,5 @@
+from collections.abc import Generator
+
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
@@ -15,10 +17,14 @@ from app.services import ecm_legal_hold as lh_service
 router = APIRouter(prefix="/ecm", tags=["ecm-legal-holds"])
 
 
-def get_db():
+def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
         yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 
@@ -33,7 +39,9 @@ def get_db():
     response_model=LegalHoldRead,
     status_code=status.HTTP_201_CREATED,
 )
-def create_legal_hold(payload: LegalHoldCreate, db: Session = Depends(get_db)):
+def create_legal_hold(
+    payload: LegalHoldCreate, db: Session = Depends(get_db)
+) -> LegalHoldRead:
     return lh_service.legal_holds.create(db, payload)
 
 
@@ -41,7 +49,7 @@ def create_legal_hold(payload: LegalHoldCreate, db: Session = Depends(get_db)):
     "/legal-holds/{hold_id}",
     response_model=LegalHoldRead,
 )
-def get_legal_hold(hold_id: str, db: Session = Depends(get_db)):
+def get_legal_hold(hold_id: str, db: Session = Depends(get_db)) -> LegalHoldRead:
     return lh_service.legal_holds.get(db, hold_id)
 
 
@@ -56,7 +64,7 @@ def list_legal_holds(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-):
+) -> dict:
     return lh_service.legal_holds.list_response(
         db, is_active, order_by, order_dir, limit, offset
     )
@@ -70,7 +78,7 @@ def update_legal_hold(
     hold_id: str,
     payload: LegalHoldUpdate,
     db: Session = Depends(get_db),
-):
+) -> LegalHoldRead:
     return lh_service.legal_holds.update(db, hold_id, payload)
 
 
@@ -78,7 +86,7 @@ def update_legal_hold(
     "/legal-holds/{hold_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
-def delete_legal_hold(hold_id: str, db: Session = Depends(get_db)):
+def delete_legal_hold(hold_id: str, db: Session = Depends(get_db)) -> None:
     lh_service.legal_holds.delete(db, hold_id)
 
 
@@ -94,7 +102,7 @@ def delete_legal_hold(hold_id: str, db: Session = Depends(get_db)):
 )
 def create_legal_hold_document(
     payload: LegalHoldDocumentCreate, db: Session = Depends(get_db)
-):
+) -> LegalHoldDocumentRead:
     return lh_service.legal_hold_documents.create(db, payload)
 
 
@@ -102,7 +110,9 @@ def create_legal_hold_document(
     "/legal-hold-documents/{lhd_id}",
     response_model=LegalHoldDocumentRead,
 )
-def get_legal_hold_document(lhd_id: str, db: Session = Depends(get_db)):
+def get_legal_hold_document(
+    lhd_id: str, db: Session = Depends(get_db)
+) -> LegalHoldDocumentRead:
     return lh_service.legal_hold_documents.get(db, lhd_id)
 
 
@@ -119,7 +129,7 @@ def list_legal_hold_documents(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-):
+) -> dict:
     return lh_service.legal_hold_documents.list_response(
         db,
         legal_hold_id,
@@ -136,5 +146,5 @@ def list_legal_hold_documents(
     "/legal-hold-documents/{lhd_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
-def delete_legal_hold_document(lhd_id: str, db: Session = Depends(get_db)):
+def delete_legal_hold_document(lhd_id: str, db: Session = Depends(get_db)) -> None:
     lh_service.legal_hold_documents.delete(db, lhd_id)

@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import logging
 
 from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.ecm import (
@@ -57,7 +60,7 @@ class Documents(ListResponseMixin):
 
         document = Document(**data)
         db.add(document)
-        db.commit()
+        db.flush()
         db.refresh(document)
         logger.info("Created document %s", document.id)
         publish_event(
@@ -89,28 +92,26 @@ class Documents(ListResponseMixin):
         order_dir: str,
         limit: int,
         offset: int,
-    ):  # type: ignore[override]
-        query = db.query(Document)
+    ) -> list[Document]:  # type: ignore[override]
+        stmt = select(Document)
         if folder_id is not None:
-            query = query.filter(Document.folder_id == coerce_uuid(folder_id))
+            stmt = stmt.where(Document.folder_id == coerce_uuid(folder_id))
         if status is not None:
-            query = query.filter(Document.status == DocumentStatus(status))
+            stmt = stmt.where(Document.status == DocumentStatus(status))
         if classification is not None:
-            query = query.filter(
+            stmt = stmt.where(
                 Document.classification == ClassificationLevel(classification)
             )
         if content_type_id is not None:
-            query = query.filter(
-                Document.content_type_id == coerce_uuid(content_type_id)
-            )
+            stmt = stmt.where(Document.content_type_id == coerce_uuid(content_type_id))
         if created_by is not None:
-            query = query.filter(Document.created_by == coerce_uuid(created_by))
+            stmt = stmt.where(Document.created_by == coerce_uuid(created_by))
         if is_active is None:
-            query = query.filter(Document.is_active.is_(True))
+            stmt = stmt.where(Document.is_active.is_(True))
         else:
-            query = query.filter(Document.is_active == is_active)
-        query = apply_ordering(
-            query,
+            stmt = stmt.where(Document.is_active == is_active)
+        stmt = apply_ordering(
+            stmt,
             order_by,
             order_dir,
             {
@@ -120,7 +121,7 @@ class Documents(ListResponseMixin):
                 "file_size": Document.file_size,
             },
         )
-        return apply_pagination(query, limit, offset).all()
+        return db.scalars(apply_pagination(stmt, limit, offset)).all()
 
     @staticmethod
     def update(db: Session, document_id: str, payload: DocumentUpdate) -> Document:
@@ -159,7 +160,7 @@ class Documents(ListResponseMixin):
         for key, value in data.items():
             setattr(document, key, value)
 
-        db.commit()
+        db.flush()
         db.refresh(document)
         logger.info("Updated document %s", document.id)
         event_type = EventType.document_updated
@@ -180,7 +181,7 @@ class Documents(ListResponseMixin):
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
         document.is_active = False
-        db.commit()
+        db.flush()
         logger.info("Soft-deleted document %s", document.id)
         publish_event(
             EventType.document_deleted,
@@ -228,7 +229,7 @@ class Documents(ListResponseMixin):
         document.storage_key = version.storage_key
         document.checksum_sha256 = version.checksum_sha256
 
-        db.commit()
+        db.flush()
         db.refresh(version)
         logger.info(
             "Created version %s (v%d) for document %s",
@@ -259,14 +260,16 @@ class Documents(ListResponseMixin):
         document_id: str,
         limit: int,
         offset: int,
-    ):
-        query = (
-            db.query(DocumentVersion)
-            .filter(DocumentVersion.document_id == coerce_uuid(document_id))
-            .filter(DocumentVersion.is_active.is_(True))
+    ) -> list[DocumentVersion]:
+        stmt = (
+            select(DocumentVersion)
+            .where(DocumentVersion.document_id == coerce_uuid(document_id))
+            .where(DocumentVersion.is_active.is_(True))
             .order_by(DocumentVersion.version_number.desc())
+            .limit(limit)
+            .offset(offset)
         )
-        return query.limit(limit).offset(offset).all()
+        return db.scalars(stmt).all()
 
     @staticmethod
     def delete_version(db: Session, document_id: str, version_id: str) -> None:
@@ -282,7 +285,7 @@ class Documents(ListResponseMixin):
             )
 
         version.is_active = False
-        db.commit()
+        db.flush()
         logger.info("Soft-deleted version %s for document %s", version_id, document_id)
         publish_event(
             EventType.version_deleted,

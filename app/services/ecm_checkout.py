@@ -1,6 +1,7 @@
 import logging
 
 from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -40,7 +41,7 @@ class Checkouts:
             raise HTTPException(
                 status_code=409, detail="Document is already checked out"
             )
-        db.commit()
+        db.flush()
         db.refresh(checkout)
         logger.info("Checked out document %s by person %s", document_id, person_id)
         publish_event(
@@ -55,10 +56,8 @@ class Checkouts:
     @staticmethod
     def get_checkout(db: Session, document_id: str) -> DocumentCheckout:
         doc_uuid = coerce_uuid(document_id)
-        checkout = (
-            db.query(DocumentCheckout)
-            .filter(DocumentCheckout.document_id == doc_uuid)
-            .first()
+        checkout = db.scalar(
+            select(DocumentCheckout).where(DocumentCheckout.document_id == doc_uuid)
         )
         if not checkout:
             raise HTTPException(status_code=404, detail="Document is not checked out")
@@ -68,10 +67,8 @@ class Checkouts:
     def checkin(db: Session, document_id: str, person_id: str) -> None:
         doc_uuid = coerce_uuid(document_id)
         person_uuid = coerce_uuid(person_id)
-        checkout = (
-            db.query(DocumentCheckout)
-            .filter(DocumentCheckout.document_id == doc_uuid)
-            .first()
+        checkout = db.scalar(
+            select(DocumentCheckout).where(DocumentCheckout.document_id == doc_uuid)
         )
         if not checkout:
             raise HTTPException(status_code=404, detail="Document is not checked out")
@@ -81,7 +78,7 @@ class Checkouts:
                 detail="Document is checked out by another person",
             )
         db.delete(checkout)
-        db.commit()
+        db.flush()
         logger.info("Checked in document %s by person %s", document_id, person_id)
         publish_event(
             EventType.document_checked_in,
@@ -94,23 +91,19 @@ class Checkouts:
     @staticmethod
     def force_unlock(db: Session, document_id: str) -> None:
         doc_uuid = coerce_uuid(document_id)
-        checkout = (
-            db.query(DocumentCheckout)
-            .filter(DocumentCheckout.document_id == doc_uuid)
-            .first()
+        checkout = db.scalar(
+            select(DocumentCheckout).where(DocumentCheckout.document_id == doc_uuid)
         )
         if not checkout:
             raise HTTPException(status_code=404, detail="Document is not checked out")
         db.delete(checkout)
-        db.commit()
+        db.flush()
         logger.info("Force-unlocked document %s", document_id)
 
     @staticmethod
     def list_checkouts(db: Session, limit: int, offset: int) -> list[DocumentCheckout]:
-        query = db.query(DocumentCheckout).order_by(
-            DocumentCheckout.checked_out_at.desc()
-        )
-        return apply_pagination(query, limit, offset).all()
+        stmt = select(DocumentCheckout).order_by(DocumentCheckout.checked_out_at.desc())
+        return db.scalars(apply_pagination(stmt, limit, offset)).all()
 
 
 checkouts = Checkouts()

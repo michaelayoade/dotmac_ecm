@@ -1,6 +1,7 @@
 import logging
 
 from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.ecm import Document, LegalHold, LegalHoldDocument
@@ -31,7 +32,7 @@ class LegalHolds(ListResponseMixin):
         data = payload.model_dump()
         hold = LegalHold(**data)
         db.add(hold)
-        db.commit()
+        db.flush()
         db.refresh(hold)
         logger.info("Created legal hold %s", hold.id)
         publish_event(
@@ -58,13 +59,13 @@ class LegalHolds(ListResponseMixin):
         limit: int,
         offset: int,
     ) -> list[LegalHold]:
-        query = db.query(LegalHold)
+        stmt = select(LegalHold)
         if is_active is None:
-            query = query.filter(LegalHold.is_active.is_(True))
+            stmt = stmt.where(LegalHold.is_active.is_(True))
         else:
-            query = query.filter(LegalHold.is_active == is_active)
-        query = apply_ordering(
-            query,
+            stmt = stmt.where(LegalHold.is_active == is_active)
+        stmt = apply_ordering(
+            stmt,
             order_by,
             order_dir,
             {
@@ -72,7 +73,7 @@ class LegalHolds(ListResponseMixin):
                 "created_at": LegalHold.created_at,
             },
         )
-        return apply_pagination(query, limit, offset).all()
+        return db.scalars(apply_pagination(stmt, limit, offset)).all()
 
     @staticmethod
     def update(
@@ -86,7 +87,7 @@ class LegalHolds(ListResponseMixin):
         data = payload.model_dump(exclude_unset=True)
         for key, value in data.items():
             setattr(hold, key, value)
-        db.commit()
+        db.flush()
         db.refresh(hold)
         logger.info("Updated legal hold %s", hold.id)
         return hold
@@ -97,7 +98,7 @@ class LegalHolds(ListResponseMixin):
         if not hold:
             raise HTTPException(status_code=404, detail="Legal hold not found")
         hold.is_active = False
-        db.commit()
+        db.flush()
         logger.info("Soft-deleted legal hold %s", hold_id)
         publish_event(
             EventType.legal_hold_released,
@@ -124,7 +125,7 @@ class LegalHoldDocuments(ListResponseMixin):
         data = payload.model_dump()
         lhd = LegalHoldDocument(**data)
         db.add(lhd)
-        db.commit()
+        db.flush()
         db.refresh(lhd)
         logger.info("Created legal hold document %s", lhd.id)
         publish_event(
@@ -154,24 +155,22 @@ class LegalHoldDocuments(ListResponseMixin):
         limit: int,
         offset: int,
     ) -> list[LegalHoldDocument]:
-        query = db.query(LegalHoldDocument)
+        stmt = select(LegalHoldDocument)
         if legal_hold_id is not None:
-            query = query.filter(
+            stmt = stmt.where(
                 LegalHoldDocument.legal_hold_id == coerce_uuid(legal_hold_id)
             )
         if document_id is not None:
-            query = query.filter(
-                LegalHoldDocument.document_id == coerce_uuid(document_id)
-            )
+            stmt = stmt.where(LegalHoldDocument.document_id == coerce_uuid(document_id))
         if added_by is not None:
-            query = query.filter(LegalHoldDocument.added_by == coerce_uuid(added_by))
-        query = apply_ordering(
-            query,
+            stmt = stmt.where(LegalHoldDocument.added_by == coerce_uuid(added_by))
+        stmt = apply_ordering(
+            stmt,
             order_by,
             order_dir,
             {"created_at": LegalHoldDocument.created_at},
         )
-        return apply_pagination(query, limit, offset).all()
+        return db.scalars(apply_pagination(stmt, limit, offset)).all()
 
     @staticmethod
     def delete(db: Session, lhd_id: str) -> None:
@@ -180,7 +179,7 @@ class LegalHoldDocuments(ListResponseMixin):
             raise HTTPException(status_code=404, detail="Legal hold document not found")
         doc_id = lhd.document_id
         db.delete(lhd)
-        db.commit()
+        db.flush()
         logger.info("Deleted legal hold document %s", lhd_id)
         publish_event(
             EventType.legal_hold_document_removed,

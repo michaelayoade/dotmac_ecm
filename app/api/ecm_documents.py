@@ -1,3 +1,5 @@
+from collections.abc import Generator
+
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
@@ -19,10 +21,14 @@ from app.services.ecm_storage import storage
 router = APIRouter(prefix="/ecm/documents", tags=["ecm-documents"])
 
 
-def get_db():
+def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
         yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 
@@ -33,12 +39,14 @@ def get_db():
 
 
 @router.post("", response_model=DocumentRead, status_code=status.HTTP_201_CREATED)
-def create_document(payload: DocumentCreate, db: Session = Depends(get_db)):
+def create_document(
+    payload: DocumentCreate, db: Session = Depends(get_db)
+) -> DocumentRead:
     return doc_service.documents.create(db, payload)
 
 
 @router.get("/{document_id}", response_model=DocumentRead)
-def get_document(document_id: str, db: Session = Depends(get_db)):
+def get_document(document_id: str, db: Session = Depends(get_db)) -> DocumentRead:
     return doc_service.documents.get(db, document_id)
 
 
@@ -55,7 +63,7 @@ def list_documents(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-):
+) -> dict:
     return doc_service.documents.list_response(
         db,
         folder_id,
@@ -74,12 +82,12 @@ def list_documents(
 @router.patch("/{document_id}", response_model=DocumentRead)
 def update_document(
     document_id: str, payload: DocumentUpdate, db: Session = Depends(get_db)
-):
+) -> DocumentRead:
     return doc_service.documents.update(db, document_id, payload)
 
 
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_document(document_id: str, db: Session = Depends(get_db)):
+def delete_document(document_id: str, db: Session = Depends(get_db)) -> None:
     doc_service.documents.delete(db, document_id)
 
 
@@ -97,12 +105,14 @@ def create_version(
     document_id: str,
     payload: DocumentVersionCreate,
     db: Session = Depends(get_db),
-):
+) -> DocumentVersionRead:
     return doc_service.documents.create_version(db, document_id, payload)
 
 
 @router.get("/{document_id}/versions/{version_id}", response_model=DocumentVersionRead)
-def get_version(document_id: str, version_id: str, db: Session = Depends(get_db)):
+def get_version(
+    document_id: str, version_id: str, db: Session = Depends(get_db)
+) -> DocumentVersionRead:
     return doc_service.documents.get_version(db, document_id, version_id)
 
 
@@ -115,7 +125,7 @@ def list_versions(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-):
+) -> dict:
     items = doc_service.documents.list_versions(db, document_id, limit, offset)
     return {"items": items, "count": len(items), "limit": limit, "offset": offset}
 
@@ -124,7 +134,9 @@ def list_versions(
     "/{document_id}/versions/{version_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
-def delete_version(document_id: str, version_id: str, db: Session = Depends(get_db)):
+def delete_version(
+    document_id: str, version_id: str, db: Session = Depends(get_db)
+) -> None:
     doc_service.documents.delete_version(db, document_id, version_id)
 
 
@@ -138,7 +150,7 @@ def generate_upload_url(
     document_id: str,
     payload: UploadURLRequest,
     db: Session = Depends(get_db),
-):
+) -> UploadURLResponse:
     doc_service.documents.get(db, document_id)
     storage_key = storage.generate_storage_key(document_id, payload.file_name)
     upload_url = storage.generate_upload_url(storage_key, payload.mime_type)
@@ -151,7 +163,7 @@ def generate_upload_url(
 )
 def generate_download_url(
     document_id: str, version_id: str, db: Session = Depends(get_db)
-):
+) -> DownloadURLResponse:
     version = doc_service.documents.get_version(db, document_id, version_id)
     download_url = storage.generate_download_url(version.storage_key)
     return DownloadURLResponse(download_url=download_url)
