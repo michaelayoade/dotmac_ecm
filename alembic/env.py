@@ -9,6 +9,7 @@ from app.models import (  # noqa: F401
     auth,
     audit,
     domain_settings,
+    ecm,
     person,
     rbac,
     scheduler,

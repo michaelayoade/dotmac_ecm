@@ -2,7 +2,6 @@ import os
 import sys
 import uuid
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, patch
 from types import ModuleType
 
 import pytest
@@ -30,13 +29,13 @@ _TestSessionLocal = sessionmaker(bind=_test_engine, autoflush=False, autocommit=
 
 
 # Create a mock db module
-mock_db_module = ModuleType('app.db')
+mock_db_module = ModuleType("app.db")
 mock_db_module.Base = TestBase
 mock_db_module.SessionLocal = _TestSessionLocal
 mock_db_module.get_engine = lambda: _test_engine
 
 # Also mock app.config to prevent .env loading
-mock_config_module = ModuleType('app.config')
+mock_config_module = ModuleType("app.config")
 
 
 class MockSettings:
@@ -49,6 +48,12 @@ class MockSettings:
     avatar_max_size_bytes = 2 * 1024 * 1024
     avatar_allowed_types = "image/jpeg,image/png,image/gif,image/webp"
     avatar_url_prefix = "/static/avatars"
+    s3_endpoint_url = ""
+    s3_access_key = ""
+    s3_secret_key = ""
+    s3_bucket_name = "ecm-documents"
+    s3_region = "us-east-1"
+    s3_presigned_url_expiry = 3600
     brand_name = "DotMac ECM"
     brand_tagline = "Electronic Content Management"
     brand_logo_url = None
@@ -58,8 +63,8 @@ mock_config_module.settings = MockSettings()
 mock_config_module.Settings = MockSettings
 
 # Insert mocks before any app imports
-sys.modules['app.config'] = mock_config_module
-sys.modules['app.db'] = mock_db_module
+sys.modules["app.config"] = mock_config_module
+sys.modules["app.db"] = mock_db_module
 
 # Set environment variables
 os.environ["JWT_SECRET"] = "test-secret"
@@ -70,10 +75,42 @@ os.environ["TOTP_ISSUER"] = "StarterTemplate"
 # Now import the models - they'll use our mocked db module
 from app.models.person import Person
 from app.models.auth import UserCredential, Session as AuthSession, SessionStatus
-from app.models.rbac import Role, Permission, RolePermission, PersonRole
+from app.models.rbac import Role, Permission, PersonRole
 from app.models.audit import AuditEvent, AuditActorType
 from app.models.domain_settings import DomainSetting, SettingDomain
 from app.models.scheduler import ScheduledTask, ScheduleType
+from app.models.ecm import (  # noqa: F401
+    ACLPermission,
+    Category,
+    ClassificationLevel,
+    Comment,
+    CommentStatus,
+    ContentType,
+    DispositionAction,
+    DispositionStatus,
+    Document,
+    DocumentACL,
+    DocumentCategory,
+    DocumentCheckout,
+    DocumentRetention,
+    DocumentStatus,
+    DocumentSubscription,
+    DocumentTag,
+    DocumentVersion,
+    Folder,
+    FolderACL,
+    LegalHold,
+    LegalHoldDocument,
+    PrincipalType,
+    RetentionPolicy,
+    Tag,
+    WorkflowDefinition,
+    WorkflowInstance,
+    WorkflowInstanceStatus,
+    WorkflowTask,
+    WorkflowTaskStatus,
+    WorkflowTaskType,
+)
 
 # Create all tables
 TestBase.metadata.create_all(_test_engine)
@@ -159,7 +196,9 @@ def client(db_session):
     app.dependency_overrides.clear()
 
 
-def _create_access_token(person_id: str, session_id: str, roles: list[str] = None, scopes: list[str] = None) -> str:
+def _create_access_token(
+    person_id: str, session_id: str, roles: list[str] = None, scopes: list[str] = None
+) -> str:
     """Create a JWT access token for testing."""
     secret = os.getenv("JWT_SECRET", "test-secret")
     algorithm = os.getenv("JWT_ALGORITHM", "HS256")
