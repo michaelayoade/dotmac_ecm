@@ -17,7 +17,9 @@ def get_db():
         db.close()
 
 
-@router.get("/auth", response_model=ListResponse[DomainSettingRead], tags=["settings-auth"])
+@router.get(
+    "/auth", response_model=ListResponse[DomainSettingRead], tags=["settings-auth"]
+)
 def list_auth_settings(
     is_active: bool | None = None,
     order_by: str = Query(default="created_at"),

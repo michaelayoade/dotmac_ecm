@@ -165,6 +165,7 @@ def test_delete_person(db_session):
     # Verify person is deleted
     from fastapi import HTTPException
     import pytest
+
     with pytest.raises(HTTPException) as exc_info:
         person_service.people.get(db_session, str(person_id))
     assert exc_info.value.status_code == 404
