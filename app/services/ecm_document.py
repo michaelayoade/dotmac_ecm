@@ -14,6 +14,7 @@ from app.models.ecm import (
 from app.models.person import Person
 from app.schemas.ecm import DocumentCreate, DocumentUpdate, DocumentVersionCreate
 from app.services.common import apply_ordering, apply_pagination, coerce_uuid
+from app.services.event import EventType, publish_event
 from app.services.response import ListResponseMixin
 
 logger = logging.getLogger(__name__)
@@ -59,6 +60,13 @@ class Documents(ListResponseMixin):
         db.commit()
         db.refresh(document)
         logger.info("Created document %s", document.id)
+        publish_event(
+            EventType.document_created,
+            entity_type="document",
+            entity_id=document.id,
+            actor_id=document.created_by,
+            document_id=document.id,
+        )
         return document
 
     @staticmethod
@@ -154,6 +162,16 @@ class Documents(ListResponseMixin):
         db.commit()
         db.refresh(document)
         logger.info("Updated document %s", document.id)
+        event_type = EventType.document_updated
+        if "status" in data:
+            event_type = EventType.document_status_changed
+        publish_event(
+            event_type,
+            entity_type="document",
+            entity_id=document.id,
+            document_id=document.id,
+            payload={"changed_fields": list(data.keys())},
+        )
         return document
 
     @staticmethod
@@ -164,6 +182,12 @@ class Documents(ListResponseMixin):
         document.is_active = False
         db.commit()
         logger.info("Soft-deleted document %s", document.id)
+        publish_event(
+            EventType.document_deleted,
+            entity_type="document",
+            entity_id=document.id,
+            document_id=document.id,
+        )
 
     # ------------------------------------------------------------------
     # Version sub-operations
@@ -212,6 +236,14 @@ class Documents(ListResponseMixin):
             next_version,
             document.id,
         )
+        publish_event(
+            EventType.version_created,
+            entity_type="document_version",
+            entity_id=version.id,
+            actor_id=version.created_by,
+            document_id=document.id,
+            payload={"version_number": next_version},
+        )
         return version
 
     @staticmethod
@@ -252,6 +284,12 @@ class Documents(ListResponseMixin):
         version.is_active = False
         db.commit()
         logger.info("Soft-deleted version %s for document %s", version_id, document_id)
+        publish_event(
+            EventType.version_deleted,
+            entity_type="document_version",
+            entity_id=version_id,
+            document_id=document_id,
+        )
 
 
 documents = Documents()

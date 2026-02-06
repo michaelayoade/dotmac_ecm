@@ -20,6 +20,7 @@ from app.schemas.ecm_acl import (
     FolderACLUpdate,
 )
 from app.services.common import apply_ordering, apply_pagination, coerce_uuid
+from app.services.event import EventType, publish_event
 from app.services.response import ListResponseMixin
 
 logger = logging.getLogger(__name__)
@@ -79,6 +80,14 @@ class DocumentACLs(ListResponseMixin):
         db.commit()
         db.refresh(acl)
         logger.info("Created document ACL %s", acl.id)
+        publish_event(
+            EventType.acl_granted,
+            entity_type="document_acl",
+            entity_id=acl.id,
+            actor_id=acl.granted_by,
+            document_id=acl.document_id,
+            payload={"permission": acl.permission.value},
+        )
         return acl
 
     @staticmethod
@@ -156,9 +165,16 @@ class DocumentACLs(ListResponseMixin):
         acl = db.get(DocumentACL, coerce_uuid(acl_id))
         if not acl:
             raise HTTPException(status_code=404, detail="Document ACL not found")
+        doc_id = acl.document_id
         acl.is_active = False
         db.commit()
         logger.info("Soft-deleted document ACL %s", acl_id)
+        publish_event(
+            EventType.acl_revoked,
+            entity_type="document_acl",
+            entity_id=acl_id,
+            document_id=doc_id,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -183,6 +199,16 @@ class FolderACLs(ListResponseMixin):
         db.commit()
         db.refresh(acl)
         logger.info("Created folder ACL %s", acl.id)
+        publish_event(
+            EventType.acl_granted,
+            entity_type="folder_acl",
+            entity_id=acl.id,
+            actor_id=acl.granted_by,
+            payload={
+                "permission": acl.permission.value,
+                "folder_id": str(acl.folder_id),
+            },
+        )
         return acl
 
     @staticmethod
@@ -266,6 +292,11 @@ class FolderACLs(ListResponseMixin):
         acl.is_active = False
         db.commit()
         logger.info("Soft-deleted folder ACL %s", acl_id)
+        publish_event(
+            EventType.acl_revoked,
+            entity_type="folder_acl",
+            entity_id=acl_id,
+        )
 
 
 document_acls = DocumentACLs()

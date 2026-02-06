@@ -23,6 +23,7 @@ from app.schemas.ecm_workflow import (
     WorkflowTaskUpdate,
 )
 from app.services.common import apply_ordering, apply_pagination, coerce_uuid
+from app.services.event import EventType, publish_event
 from app.services.response import ListResponseMixin
 
 logger = logging.getLogger(__name__)
@@ -157,6 +158,13 @@ class WorkflowInstances(ListResponseMixin):
         db.commit()
         db.refresh(instance)
         logger.info("Created workflow instance %s", instance.id)
+        publish_event(
+            EventType.workflow_started,
+            entity_type="workflow_instance",
+            entity_id=instance.id,
+            actor_id=instance.started_by,
+            document_id=instance.document_id,
+        )
         return instance
 
     @staticmethod
@@ -224,6 +232,20 @@ class WorkflowInstances(ListResponseMixin):
         db.commit()
         db.refresh(instance)
         logger.info("Updated workflow instance %s", instance.id)
+        if instance.status == WorkflowInstanceStatus.completed:
+            publish_event(
+                EventType.workflow_completed,
+                entity_type="workflow_instance",
+                entity_id=instance.id,
+                document_id=instance.document_id,
+            )
+        elif instance.status == WorkflowInstanceStatus.cancelled:
+            publish_event(
+                EventType.workflow_cancelled,
+                entity_type="workflow_instance",
+                entity_id=instance.id,
+                document_id=instance.document_id,
+            )
         return instance
 
     @staticmethod
@@ -257,6 +279,12 @@ class WorkflowTasks(ListResponseMixin):
         db.commit()
         db.refresh(task)
         logger.info("Created workflow task %s", task.id)
+        publish_event(
+            EventType.workflow_task_created,
+            entity_type="workflow_task",
+            entity_id=task.id,
+            actor_id=task.assignee_id,
+        )
         return task
 
     @staticmethod
@@ -348,6 +376,13 @@ class WorkflowTasks(ListResponseMixin):
         db.commit()
         db.refresh(task)
         logger.info("Completed workflow task %s with status %s", task.id, status)
+        publish_event(
+            EventType.workflow_task_completed,
+            entity_type="workflow_task",
+            entity_id=task.id,
+            actor_id=task.assignee_id,
+            payload={"decision": status},
+        )
         return task
 
 

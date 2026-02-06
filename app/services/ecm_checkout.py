@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.models.ecm import Document, DocumentCheckout
 from app.models.person import Person
 from app.services.common import apply_pagination, coerce_uuid
+from app.services.event import EventType, publish_event
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,13 @@ class Checkouts:
         db.commit()
         db.refresh(checkout)
         logger.info("Checked out document %s by person %s", document_id, person_id)
+        publish_event(
+            EventType.document_checked_out,
+            entity_type="document_checkout",
+            entity_id=checkout.id,
+            actor_id=person_uuid,
+            document_id=doc_uuid,
+        )
         return checkout
 
     @staticmethod
@@ -75,6 +83,13 @@ class Checkouts:
         db.delete(checkout)
         db.commit()
         logger.info("Checked in document %s by person %s", document_id, person_id)
+        publish_event(
+            EventType.document_checked_in,
+            entity_type="document_checkout",
+            entity_id=doc_uuid,
+            actor_id=person_uuid,
+            document_id=doc_uuid,
+        )
 
     @staticmethod
     def force_unlock(db: Session, document_id: str) -> None:

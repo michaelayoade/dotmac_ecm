@@ -21,6 +21,7 @@ from app.schemas.ecm_retention import (
     RetentionPolicyUpdate,
 )
 from app.services.common import apply_ordering, apply_pagination, coerce_uuid
+from app.services.event import EventType, publish_event
 from app.services.response import ListResponseMixin
 
 logger = logging.getLogger(__name__)
@@ -176,6 +177,12 @@ class DocumentRetentions(ListResponseMixin):
         db.commit()
         db.refresh(retention)
         logger.info("Created document retention %s", retention.id)
+        publish_event(
+            EventType.retention_applied,
+            entity_type="document_retention",
+            entity_id=retention.id,
+            document_id=retention.document_id,
+        )
         return retention
 
     @staticmethod
@@ -268,6 +275,13 @@ class DocumentRetentions(ListResponseMixin):
         db.commit()
         db.refresh(retention)
         logger.info("Disposed document retention %s", retention.id)
+        publish_event(
+            EventType.retention_disposed,
+            entity_type="document_retention",
+            entity_id=retention.id,
+            actor_id=retention.disposed_by,
+            document_id=retention.document_id,
+        )
         return retention
 
 

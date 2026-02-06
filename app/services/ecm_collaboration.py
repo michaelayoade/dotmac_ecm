@@ -17,6 +17,7 @@ from app.schemas.ecm_collaboration import (
     DocumentSubscriptionUpdate,
 )
 from app.services.common import apply_ordering, apply_pagination, coerce_uuid
+from app.services.event import EventType, publish_event
 from app.services.response import ListResponseMixin
 
 logger = logging.getLogger(__name__)
@@ -62,6 +63,13 @@ class Comments(ListResponseMixin):
         db.commit()
         db.refresh(comment)
         logger.info("Created comment %s", comment.id)
+        publish_event(
+            EventType.comment_created,
+            entity_type="comment",
+            entity_id=comment.id,
+            actor_id=comment.author_id,
+            document_id=comment.document_id,
+        )
         return comment
 
     @staticmethod
@@ -119,6 +127,13 @@ class Comments(ListResponseMixin):
         db.commit()
         db.refresh(comment)
         logger.info("Updated comment %s", comment.id)
+        publish_event(
+            EventType.comment_updated,
+            entity_type="comment",
+            entity_id=comment.id,
+            actor_id=comment.author_id,
+            document_id=comment.document_id,
+        )
         return comment
 
     @staticmethod
@@ -126,9 +141,16 @@ class Comments(ListResponseMixin):
         comment = db.get(Comment, coerce_uuid(comment_id))
         if not comment:
             raise HTTPException(status_code=404, detail="Comment not found")
+        doc_id = comment.document_id
         comment.is_active = False
         db.commit()
         logger.info("Soft-deleted comment %s", comment_id)
+        publish_event(
+            EventType.comment_deleted,
+            entity_type="comment",
+            entity_id=comment_id,
+            document_id=doc_id,
+        )
 
 
 # ---------------------------------------------------------------------------

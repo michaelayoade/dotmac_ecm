@@ -11,6 +11,7 @@ from app.schemas.ecm_legal_hold import (
     LegalHoldUpdate,
 )
 from app.services.common import apply_ordering, apply_pagination, coerce_uuid
+from app.services.event import EventType, publish_event
 from app.services.response import ListResponseMixin
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,12 @@ class LegalHolds(ListResponseMixin):
         db.commit()
         db.refresh(hold)
         logger.info("Created legal hold %s", hold.id)
+        publish_event(
+            EventType.legal_hold_created,
+            entity_type="legal_hold",
+            entity_id=hold.id,
+            actor_id=hold.created_by,
+        )
         return hold
 
     @staticmethod
@@ -92,6 +99,11 @@ class LegalHolds(ListResponseMixin):
         hold.is_active = False
         db.commit()
         logger.info("Soft-deleted legal hold %s", hold_id)
+        publish_event(
+            EventType.legal_hold_released,
+            entity_type="legal_hold",
+            entity_id=hold_id,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -115,6 +127,13 @@ class LegalHoldDocuments(ListResponseMixin):
         db.commit()
         db.refresh(lhd)
         logger.info("Created legal hold document %s", lhd.id)
+        publish_event(
+            EventType.legal_hold_document_added,
+            entity_type="legal_hold_document",
+            entity_id=lhd.id,
+            actor_id=lhd.added_by,
+            document_id=lhd.document_id,
+        )
         return lhd
 
     @staticmethod
@@ -159,9 +178,16 @@ class LegalHoldDocuments(ListResponseMixin):
         lhd = db.get(LegalHoldDocument, coerce_uuid(lhd_id))
         if not lhd:
             raise HTTPException(status_code=404, detail="Legal hold document not found")
+        doc_id = lhd.document_id
         db.delete(lhd)
         db.commit()
         logger.info("Deleted legal hold document %s", lhd_id)
+        publish_event(
+            EventType.legal_hold_document_removed,
+            entity_type="legal_hold_document",
+            entity_id=lhd_id,
+            document_id=doc_id,
+        )
 
 
 legal_holds = LegalHolds()

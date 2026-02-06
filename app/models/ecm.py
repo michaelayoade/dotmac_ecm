@@ -885,3 +885,118 @@ class LegalHoldDocument(Base):
     legal_hold = relationship("LegalHold", back_populates="documents")
     document = relationship("Document")
     adder = relationship("Person", foreign_keys=[added_by])
+
+
+# ---------------------------------------------------------------------------
+# Notifications
+# ---------------------------------------------------------------------------
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+    __table_args__ = (
+        Index("ix_notifications_person_id", "person_id"),
+        Index("ix_notifications_is_read", "is_read"),
+        Index("ix_notifications_event_type", "event_type"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    person_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("people.id"), nullable=False
+    )
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    event_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    entity_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    metadata_: Mapped[dict | None] = mapped_column("metadata", JSON)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    person = relationship("Person", foreign_keys=[person_id])
+
+
+# ---------------------------------------------------------------------------
+# Webhooks
+# ---------------------------------------------------------------------------
+
+
+class WebhookDeliveryStatus(enum.Enum):
+    pending = "pending"
+    success = "success"
+    failed = "failed"
+
+
+class WebhookEndpoint(Base):
+    __tablename__ = "webhook_endpoints"
+    __table_args__ = (
+        UniqueConstraint("url", "created_by", name="uq_webhook_endpoints_url_creator"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    secret: Mapped[str | None] = mapped_column(String(255))
+    event_types: Mapped[list] = mapped_column(JSON, nullable=False)
+    created_by: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("people.id"), nullable=False
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    creator = relationship("Person", foreign_keys=[created_by])
+    deliveries = relationship("WebhookDelivery", back_populates="endpoint")
+
+
+class WebhookDelivery(Base):
+    __tablename__ = "webhook_deliveries"
+    __table_args__ = (
+        Index("ix_webhook_deliveries_endpoint_id", "endpoint_id"),
+        Index("ix_webhook_deliveries_status", "status"),
+        Index("ix_webhook_deliveries_created_at", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    endpoint_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("webhook_endpoints.id"), nullable=False
+    )
+    event_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+    status: Mapped[WebhookDeliveryStatus] = mapped_column(
+        Enum(WebhookDeliveryStatus), default=WebhookDeliveryStatus.pending
+    )
+    response_status_code: Mapped[int | None] = mapped_column(Integer)
+    response_body: Mapped[str | None] = mapped_column(Text)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+    endpoint = relationship("WebhookEndpoint", back_populates="deliveries")
