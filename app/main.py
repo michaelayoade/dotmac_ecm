@@ -186,10 +186,14 @@ _include_api_router(scheduler_router, dependencies=[Depends(require_user_auth)])
 from app.api.ecm_documents import router as ecm_documents_router  # noqa: E402
 from app.api.ecm_folders import router as ecm_folders_router  # noqa: E402
 from app.api.ecm_metadata import router as ecm_metadata_router  # noqa: E402
+from app.api.ecm_acl import router as ecm_acl_router  # noqa: E402
+from app.api.ecm_checkouts import router as ecm_checkouts_router  # noqa: E402
 
 _include_api_router(ecm_folders_router, dependencies=[Depends(require_user_auth)])
+_include_api_router(ecm_checkouts_router, dependencies=[Depends(require_user_auth)])
 _include_api_router(ecm_documents_router, dependencies=[Depends(require_user_auth)])
 _include_api_router(ecm_metadata_router, dependencies=[Depends(require_user_auth)])
+_include_api_router(ecm_acl_router, dependencies=[Depends(require_user_auth)])
 app.include_router(web_home_router)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")

@@ -180,6 +180,8 @@ def client(db_session):
     from app.api.ecm_folders import get_db as ecm_folders_get_db
     from app.api.ecm_documents import get_db as ecm_documents_get_db
     from app.api.ecm_metadata import get_db as ecm_metadata_get_db
+    from app.api.ecm_acl import get_db as ecm_acl_get_db  # noqa: F811
+    from app.api.ecm_checkouts import get_db as ecm_checkouts_get_db  # noqa: F811
 
     def override_get_db():
         yield db_session
@@ -195,6 +197,8 @@ def client(db_session):
     app.dependency_overrides[ecm_folders_get_db] = override_get_db
     app.dependency_overrides[ecm_documents_get_db] = override_get_db
     app.dependency_overrides[ecm_metadata_get_db] = override_get_db
+    app.dependency_overrides[ecm_acl_get_db] = override_get_db
+    app.dependency_overrides[ecm_checkouts_get_db] = override_get_db
 
     with TestClient(app, raise_server_exceptions=False) as test_client:
         yield test_client
