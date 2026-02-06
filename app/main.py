@@ -169,6 +169,7 @@ def _to_list(setting: DomainSetting, upper: bool) -> set[str] | list[str]:
 def _is_audit_path_skipped(path: str, skip_paths: list[str]) -> bool:
     return any(path.startswith(prefix) for prefix in skip_paths)
 
+
 def _include_api_router(router, dependencies=None):
     app.include_router(router, dependencies=dependencies)
     app.include_router(router, prefix="/api/v1", dependencies=dependencies)
@@ -181,6 +182,14 @@ _include_api_router(people_router, dependencies=[Depends(require_user_auth)])
 _include_api_router(audit_router)
 _include_api_router(settings_router, dependencies=[Depends(require_user_auth)])
 _include_api_router(scheduler_router, dependencies=[Depends(require_user_auth)])
+
+from app.api.ecm_documents import router as ecm_documents_router  # noqa: E402
+from app.api.ecm_folders import router as ecm_folders_router  # noqa: E402
+from app.api.ecm_metadata import router as ecm_metadata_router  # noqa: E402
+
+_include_api_router(ecm_folders_router, dependencies=[Depends(require_user_auth)])
+_include_api_router(ecm_documents_router, dependencies=[Depends(require_user_auth)])
+_include_api_router(ecm_metadata_router, dependencies=[Depends(require_user_auth)])
 app.include_router(web_home_router)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -195,4 +204,3 @@ def health_check():
 def metrics():
     data = generate_latest()
     return Response(content=data, media_type=CONTENT_TYPE_LATEST)
-

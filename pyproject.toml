@@ -29,6 +29,7 @@ python-jose = {version = "3.3.0", extras = ["cryptography"]}
 passlib = {version = "1.7.4", extras = ["bcrypt"]}
 pyotp = "2.9.0"
 cryptography = "42.0.8"
+boto3 = "^1.42.43"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "8.2.2"

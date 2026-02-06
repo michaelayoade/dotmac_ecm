@@ -177,6 +177,9 @@ def client(db_session):
     from app.api.settings import get_db as settings_get_db
     from app.api.scheduler import get_db as scheduler_get_db
     from app.services.auth_dependencies import _get_db as auth_deps_get_db
+    from app.api.ecm_folders import get_db as ecm_folders_get_db
+    from app.api.ecm_documents import get_db as ecm_documents_get_db
+    from app.api.ecm_metadata import get_db as ecm_metadata_get_db
 
     def override_get_db():
         yield db_session
@@ -189,6 +192,9 @@ def client(db_session):
     app.dependency_overrides[settings_get_db] = override_get_db
     app.dependency_overrides[scheduler_get_db] = override_get_db
     app.dependency_overrides[auth_deps_get_db] = override_get_db
+    app.dependency_overrides[ecm_folders_get_db] = override_get_db
+    app.dependency_overrides[ecm_documents_get_db] = override_get_db
+    app.dependency_overrides[ecm_metadata_get_db] = override_get_db
 
     with TestClient(app, raise_server_exceptions=False) as test_client:
         yield test_client
@@ -398,3 +404,72 @@ def scheduled_task(db_session):
     db_session.commit()
     db_session.refresh(task)
     return task
+
+
+# ============ ECM Fixtures ============
+
+
+@pytest.fixture()
+def folder(db_session, person):
+    """Create a test ECM folder."""
+    f = Folder(
+        name=f"test_folder_{uuid.uuid4().hex[:8]}",
+        created_by=person.id,
+        path=f"/test_folder_{uuid.uuid4().hex[:8]}",
+        depth=0,
+    )
+    db_session.add(f)
+    db_session.commit()
+    db_session.refresh(f)
+    return f
+
+
+@pytest.fixture()
+def content_type(db_session):
+    """Create a test content type."""
+    ct = ContentType(name=f"ct_{uuid.uuid4().hex[:8]}")
+    db_session.add(ct)
+    db_session.commit()
+    db_session.refresh(ct)
+    return ct
+
+
+@pytest.fixture()
+def document(db_session, person, folder):
+    """Create a test ECM document."""
+    doc = Document(
+        title=f"test_doc_{uuid.uuid4().hex[:8]}",
+        file_name="test.pdf",
+        file_size=1024,
+        mime_type="application/pdf",
+        created_by=person.id,
+        folder_id=folder.id,
+    )
+    db_session.add(doc)
+    db_session.commit()
+    db_session.refresh(doc)
+    return doc
+
+
+@pytest.fixture()
+def tag(db_session):
+    """Create a test tag."""
+    t = Tag(name=f"tag_{uuid.uuid4().hex[:8]}")
+    db_session.add(t)
+    db_session.commit()
+    db_session.refresh(t)
+    return t
+
+
+@pytest.fixture()
+def category(db_session):
+    """Create a test category."""
+    cat = Category(
+        name=f"cat_{uuid.uuid4().hex[:8]}",
+        path=f"/cat_{uuid.uuid4().hex[:8]}",
+        depth=0,
+    )
+    db_session.add(cat)
+    db_session.commit()
+    db_session.refresh(cat)
+    return cat
