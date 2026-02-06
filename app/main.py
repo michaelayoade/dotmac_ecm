@@ -190,6 +190,8 @@ from app.api.ecm_acl import router as ecm_acl_router  # noqa: E402
 from app.api.ecm_checkouts import router as ecm_checkouts_router  # noqa: E402
 from app.api.ecm_workflows import router as ecm_workflows_router  # noqa: E402
 from app.api.ecm_collaboration import router as ecm_collaboration_router  # noqa: E402
+from app.api.ecm_retention import router as ecm_retention_router  # noqa: E402
+from app.api.ecm_legal_holds import router as ecm_legal_holds_router  # noqa: E402
 
 _include_api_router(ecm_folders_router, dependencies=[Depends(require_user_auth)])
 _include_api_router(ecm_checkouts_router, dependencies=[Depends(require_user_auth)])
@@ -198,6 +200,8 @@ _include_api_router(ecm_metadata_router, dependencies=[Depends(require_user_auth
 _include_api_router(ecm_acl_router, dependencies=[Depends(require_user_auth)])
 _include_api_router(ecm_workflows_router, dependencies=[Depends(require_user_auth)])
 _include_api_router(ecm_collaboration_router, dependencies=[Depends(require_user_auth)])
+_include_api_router(ecm_retention_router, dependencies=[Depends(require_user_auth)])
+_include_api_router(ecm_legal_holds_router, dependencies=[Depends(require_user_auth)])
 app.include_router(web_home_router)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")

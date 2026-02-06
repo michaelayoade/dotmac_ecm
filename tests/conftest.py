@@ -184,6 +184,8 @@ def client(db_session):
     from app.api.ecm_checkouts import get_db as ecm_checkouts_get_db  # noqa: F811
     from app.api.ecm_workflows import get_db as ecm_workflows_get_db  # noqa: F811
     from app.api.ecm_collaboration import get_db as ecm_collaboration_get_db  # noqa: F811
+    from app.api.ecm_retention import get_db as ecm_retention_get_db  # noqa: F811
+    from app.api.ecm_legal_holds import get_db as ecm_legal_holds_get_db  # noqa: F811
 
     def override_get_db():
         yield db_session
@@ -203,6 +205,8 @@ def client(db_session):
     app.dependency_overrides[ecm_checkouts_get_db] = override_get_db
     app.dependency_overrides[ecm_workflows_get_db] = override_get_db
     app.dependency_overrides[ecm_collaboration_get_db] = override_get_db
+    app.dependency_overrides[ecm_retention_get_db] = override_get_db
+    app.dependency_overrides[ecm_legal_holds_get_db] = override_get_db
 
     with TestClient(app, raise_server_exceptions=False) as test_client:
         yield test_client
