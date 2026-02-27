@@ -3,14 +3,14 @@ set -euo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 
 # ---- Injected at spawn time ----
-WORKTREE_DIR=/home/dotmac/projects/dotmac_ecm/.worktrees/fix-security-c1-2
+WORKTREE_DIR=/home/dotmac/projects/dotmac_ecm/.worktrees/fix-security-c1-9
 PROJECT_DIR=/home/dotmac/projects/dotmac_ecm
 SCRIPT_DIR=/home/dotmac/.seabone/scripts
 ACTIVE_FILE=/home/dotmac/projects/dotmac_ecm/.seabone/active-tasks.json
-LOG_FILE=/home/dotmac/projects/dotmac_ecm/.seabone/logs/fix-security-c1-2.log
-TASK_ID=fix-security-c1-2
-DESCRIPTION=Fix\ webhook\ SSRF\ in\ app/schemas/webhook.py.\ The\ url\ field\ on\ WebhookEndpointCreate\ \(around\ line\ 12\)\ accepts\ any\ string\ with\ no\ validation\,\ allowing\ SSRF\ attacks.\ Add\ a\ Pydantic\ field_validator\ that\ rejects:\ non-HTTP\(S\)\ schemes\,\ loopback\ addresses\ \(127.x.x.x\,\ ::1\)\,\ link-local\ \(169.254.x.x\)\,\ and\ RFC\ 1918\ private\ IP\ ranges\ \(10.x\,\ 172.16-31.x\,\ 192.168.x\).\ Use\ Python\ stdlib\ ipaddress\ and\ urllib.parse.urlparse\ only\ —\ no\ new\ dependencies.\ Read\ app/schemas/webhook.py\ and\ app/tasks/webhooks.py\ first\ to\ understand\ the\ full\ context.
-BRANCH=agent/fix-security-c1-2
+LOG_FILE=/home/dotmac/projects/dotmac_ecm/.seabone/logs/fix-security-c1-9.log
+TASK_ID=fix-security-c1-9
+DESCRIPTION=Fix\ avatar\ upload\ type\ validation\ in\ app/services/avatar.py\ \(around\ line\ 15\).\ Currently\ only\ the\ client-supplied\ Content-Type\ header\ is\ used\ for\ type\ validation\ —\ a\ spoofing\ risk.\ Add\ magic-byte\ validation:\ after\ receiving\ the\ file\,\ read\ the\ first\ 512\ bytes\ and\ verify\ they\ match\ allowed\ signatures:\ JPEG\ \(FF\ D8\ FF\)\,\ PNG\ \(89\ 50\ 4E\ 47\ 0D\ 0A\ 1A\ 0A\)\,\ GIF\ \(47\ 49\ 46\ 38\)\,\ WebP\ \(52\ 49\ 46\ 46\ ...\ 57\ 45\ 42\ 50\).\ Check\ pyproject.toml\ for\ python-magic\;\ use\ it\ if\ present\,\ otherwise\ use\ raw\ bytes\ comparison.\ Raise\ HTTP\ 415\ if\ magic\ bytes\ do\ not\ match.\ Read\ avatar.py\ and\ pyproject.toml\ first.
+BRANCH=agent/fix-security-c1-9
 ENGINE=codex
 MODEL=gpt-5.3-codex
 EVENT_LOG=/home/dotmac/projects/dotmac_ecm/.seabone/logs/events.log

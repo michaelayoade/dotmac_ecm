@@ -36,6 +36,17 @@ class TestAvatarValidation:
             # Should not raise
             avatar_service.validate_avatar(file)
 
+    def test_validate_avatar_valid_magic_bytes(self):
+        """Test validation passes when content type and magic bytes match."""
+        with patch.object(
+            avatar_service.settings,
+            "avatar_allowed_types",
+            "image/jpeg,image/png",
+        ):
+            file = MagicMock(spec=UploadFile)
+            file.content_type = "image/jpeg"
+            avatar_service.validate_avatar(file, b"\xff\xd8\xff\xee\x01")
+
     def test_validate_avatar_invalid_type(self):
         """Test validation fails for disallowed content type."""
         with patch.object(
@@ -63,6 +74,32 @@ class TestAvatarValidation:
                 avatar_service.validate_avatar(file)
             assert exc.value.status_code == 400
 
+    def test_validate_avatar_magic_type_mismatch(self):
+        """Test validation fails when magic bytes don't match declared type."""
+        with patch.object(
+            avatar_service.settings,
+            "avatar_allowed_types",
+            "image/jpeg,image/png",
+        ):
+            file = MagicMock(spec=UploadFile)
+            file.content_type = "image/jpeg"
+            with pytest.raises(HTTPException) as exc:
+                avatar_service.validate_avatar(file, b"\x89PNG\r\n\x1a\ncontent")
+            assert exc.value.status_code == 415
+
+    def test_validate_avatar_invalid_magic_bytes(self):
+        """Test validation fails when magic bytes are not a supported image format."""
+        with patch.object(
+            avatar_service.settings,
+            "avatar_allowed_types",
+            "image/jpeg,image/png,image/gif,image/webp",
+        ):
+            file = MagicMock(spec=UploadFile)
+            file.content_type = "image/jpeg"
+            with pytest.raises(HTTPException) as exc:
+                avatar_service.validate_avatar(file, b"not-an-image")
+            assert exc.value.status_code == 415
+
 
 class TestAvatarSizeLimits:
     """Tests for avatar file size validation."""
@@ -70,7 +107,7 @@ class TestAvatarSizeLimits:
     @pytest.mark.asyncio
     async def test_save_avatar_within_size_limit(self, tmp_path):
         """Test saving avatar that's within size limit."""
-        content = b"x" * 1000  # 1KB file
+        content = b"\xff\xd8\xff" + b"x" * 997  # 1KB file with JPEG signature
         file = MagicMock(spec=UploadFile)
         file.content_type = "image/jpeg"
         file.read = AsyncMock(return_value=content)
@@ -94,7 +131,7 @@ class TestAvatarSizeLimits:
     @pytest.mark.asyncio
     async def test_save_avatar_exceeds_size_limit(self, tmp_path):
         """Test saving avatar that exceeds size limit."""
-        content = b"x" * (3 * 1024 * 1024)  # 3MB file
+        content = b"\xff\xd8\xff" + b"x" * ((3 * 1024 * 1024) - 3)  # 3MB JPEG
         file = MagicMock(spec=UploadFile)
         file.content_type = "image/jpeg"
         file.read = AsyncMock(return_value=content)
@@ -114,10 +151,31 @@ class TestAvatarSizeLimits:
                     assert "too large" in exc.value.detail.lower()
 
     @pytest.mark.asyncio
+    async def test_save_avatar_magic_bytes_mismatch(self, tmp_path):
+        """Test saving avatar fails when signature does not match content type."""
+        content = b"\x89PNG\r\n\x1a\n" + b"x" * 100
+        file = MagicMock(spec=UploadFile)
+        file.content_type = "image/jpeg"
+        file.read = AsyncMock(return_value=content)
+
+        with patch.object(
+            avatar_service.settings, "avatar_allowed_types", "image/jpeg,image/png"
+        ):
+            with patch.object(
+                avatar_service.settings, "avatar_max_size_bytes", 1024 * 1024
+            ):
+                with patch.object(
+                    avatar_service.settings, "avatar_upload_dir", str(tmp_path)
+                ):
+                    with pytest.raises(HTTPException) as exc:
+                        await avatar_service.save_avatar(file, "person-123")
+                    assert exc.value.status_code == 415
+
+    @pytest.mark.asyncio
     async def test_save_avatar_creates_directory(self, tmp_path):
         """Test that save_avatar creates upload directory if it doesn't exist."""
         upload_dir = tmp_path / "avatars" / "nested"
-        content = b"x" * 100
+        content = b"\x89PNG\r\n\x1a\n" + b"x" * 92
         file = MagicMock(spec=UploadFile)
         file.content_type = "image/png"
         file.read = AsyncMock(return_value=content)
