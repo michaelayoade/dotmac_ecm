@@ -1,6 +1,9 @@
+import os
+import time
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, status
+import redis
 from sqlalchemy.orm import Session
 
 from app.db import SessionLocal
@@ -46,6 +49,64 @@ from app.services.email import send_password_reset_email
 from app.services.common import coerce_uuid
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+_RATE_LIMIT_WINDOW_SECONDS = 60
+_RATE_LIMIT_REDIS_CLIENT: redis.Redis | None = None
+
+
+def _get_rate_limit_redis_client() -> redis.Redis | None:
+    global _RATE_LIMIT_REDIS_CLIENT
+    if _RATE_LIMIT_REDIS_CLIENT is not None:
+        return _RATE_LIMIT_REDIS_CLIENT
+
+    url = os.getenv("REDIS_URL")
+    if not url:
+        return None
+
+    try:
+        client = redis.Redis.from_url(url, decode_responses=True)
+        client.ping()
+        _RATE_LIMIT_REDIS_CLIENT = client
+        return client
+    except redis.RedisError:
+        return None
+
+
+def _source_ip(request: Request) -> str:
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
+
+
+def _rate_limit_dependency(scope: str, max_requests: int):
+    window = max(_RATE_LIMIT_WINDOW_SECONDS, 1)
+    allowed = max(max_requests, 1)
+
+    def dependency(request: Request):
+        redis_client = _get_rate_limit_redis_client()
+        if not redis_client:
+            raise HTTPException(
+                status_code=503,
+                detail="Rate limiting unavailable (Redis required)",
+            )
+
+        source_ip = _source_ip(request)
+        bucket = int(time.time() // window)
+        key = f"auth_flow_rl:{scope}:{source_ip}:{bucket}"
+
+        try:
+            count = redis_client.incr(key)
+            if count == 1:
+                redis_client.expire(key, window)
+        except redis.RedisError as exc:
+            raise HTTPException(
+                status_code=503,
+                detail="Rate limiting unavailable (Redis error)",
+            ) from exc
+
+        if count > allowed:
+            raise HTTPException(status_code=429, detail="Rate limit exceeded")
+
+    return dependency
 
 
 def get_db():
@@ -59,6 +120,7 @@ def get_db():
 @router.post(
     "/login",
     response_model=LoginResponse,
+    dependencies=[Depends(_rate_limit_dependency("login", 5))],
     status_code=status.HTTP_200_OK,
     responses={
         428: {
@@ -125,6 +187,7 @@ def mfa_confirm(
 @router.post(
     "/mfa/verify",
     response_model=TokenResponse,
+    dependencies=[Depends(_rate_limit_dependency("mfa_verify", 5))],
     status_code=status.HTTP_200_OK,
     responses={
         401: {"model": ErrorResponse},
@@ -142,6 +205,7 @@ def mfa_verify(
 @router.post(
     "/refresh",
     response_model=TokenResponse,
+    dependencies=[Depends(_rate_limit_dependency("refresh", 10))],
     status_code=status.HTTP_200_OK,
     responses={
         401: {"model": ErrorResponse},
@@ -456,6 +520,7 @@ def change_password(
 @router.post(
     "/forgot-password",
     response_model=ForgotPasswordResponse,
+    dependencies=[Depends(_rate_limit_dependency("forgot_password", 3))],
     status_code=status.HTTP_200_OK,
 )
 def forgot_password(

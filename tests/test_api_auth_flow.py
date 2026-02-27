@@ -1,7 +1,9 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 
+import pytest
 
+from app.api import auth_flow as auth_flow_api
 from app.models.auth import (
     PasswordResetToken,
     Session as AuthSession,
@@ -11,6 +13,25 @@ from app.models.auth import (
 from app.models.person import Person
 from app.services import auth_flow as auth_flow_service
 from app.services.auth_flow import hash_password
+
+
+class _FakeRateLimitRedis:
+    def __init__(self):
+        self.store = {}
+
+    def incr(self, key):
+        self.store[key] = int(self.store.get(key, 0)) + 1
+        return self.store[key]
+
+    def expire(self, key, _seconds):
+        return True
+
+
+@pytest.fixture(autouse=True)
+def rate_limit_redis(monkeypatch):
+    fake = _FakeRateLimitRedis()
+    monkeypatch.setattr(auth_flow_api, "_get_rate_limit_redis_client", lambda: fake)
+    return fake
 
 
 class TestLoginAPI:
@@ -578,3 +599,48 @@ class TestAuthFlowAPIV1:
         payload = {"email": "test@example.com"}
         response = client.post("/api/v1/auth/forgot-password", json=payload)
         assert response.status_code == 200
+
+
+class TestAuthFlowRateLimiting:
+    def test_login_rate_limit_enforced(self, client):
+        payload = {"username": "nonexistent", "password": "wrongpassword"}
+        for _ in range(5):
+            response = client.post("/auth/login", json=payload)
+            assert response.status_code in [401, 404]
+
+        response = client.post("/auth/login", json=payload)
+        assert response.status_code == 429
+
+    def test_forgot_password_rate_limit_enforced(self, client):
+        payload = {"email": "nobody@example.com"}
+        for _ in range(3):
+            response = client.post("/auth/forgot-password", json=payload)
+            assert response.status_code == 200
+
+        response = client.post("/auth/forgot-password", json=payload)
+        assert response.status_code == 429
+
+    def test_mfa_verify_rate_limit_enforced(self, client):
+        payload = {"mfa_token": "invalid-mfa-token", "code": "123456"}
+        for _ in range(5):
+            response = client.post("/auth/mfa/verify", json=payload)
+            assert response.status_code in [401, 404]
+
+        response = client.post("/auth/mfa/verify", json=payload)
+        assert response.status_code == 429
+
+    def test_refresh_rate_limit_enforced(self, client):
+        payload = {"refresh_token": "invalid-refresh-token"}
+        for _ in range(10):
+            response = client.post("/auth/refresh", json=payload)
+            assert response.status_code == 401
+
+        response = client.post("/auth/refresh", json=payload)
+        assert response.status_code == 429
+
+    def test_rate_limit_returns_503_when_redis_is_unavailable(self, client, monkeypatch):
+        monkeypatch.setattr(auth_flow_api, "_get_rate_limit_redis_client", lambda: None)
+        response = client.post(
+            "/auth/login", json={"username": "nonexistent", "password": "wrongpassword"}
+        )
+        assert response.status_code == 503
