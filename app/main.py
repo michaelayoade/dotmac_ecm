@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from time import monotonic
 from threading import Lock
 from starlette.responses import Response
@@ -29,6 +30,7 @@ from app.logging import configure_logging
 from app.observability import ObservabilityMiddleware
 from app.telemetry import setup_otel
 from app.errors import register_error_handlers
+from app.config import settings
 
 
 @asynccontextmanager
@@ -53,6 +55,26 @@ configure_logging()
 setup_otel(app)
 app.add_middleware(ObservabilityMiddleware)
 register_error_handlers(app)
+
+# CORS middleware configuration
+origins = []
+if settings.cors_allow_origins:
+    origins = [origin.strip() for origin in settings.cors_allow_origins.split(",") if origin.strip()]
+
+allow_credentials = True
+if "*" in origins:
+    allow_credentials = False
+elif not origins:  # empty list → wildcard
+    origins = ["*"]
+    allow_credentials = False
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=allow_credentials,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.middleware("http")

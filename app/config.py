@@ -40,5 +40,8 @@ class Settings:
     brand_tagline: str = os.getenv("BRAND_TAGLINE", "Electronic Content Management")
     brand_logo_url: str | None = os.getenv("BRAND_LOGO_URL") or None
 
+    # CORS settings
+    cors_allow_origins: str = os.getenv("CORS_ALLOW_ORIGINS", "")
+
 
 settings = Settings()
