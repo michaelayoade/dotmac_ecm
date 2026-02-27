@@ -90,6 +90,7 @@ def require_audit_auth(
             actor_id = str(payload.get("sub"))
             if request is not None:
                 request.state.actor_id = actor_id
+                request.state.actor_type = "user"
             return {"actor_type": "user", "actor_id": actor_id}
         session = (
             db.query(AuthSession)
@@ -102,6 +103,7 @@ def require_audit_auth(
         if session:
             if request is not None:
                 request.state.actor_id = str(session.person_id)
+                request.state.actor_type = "user"
             return {"actor_type": "user", "actor_id": str(session.person_id)}
     if x_api_key:
         api_key = (
@@ -115,6 +117,7 @@ def require_audit_auth(
         if api_key:
             if request is not None:
                 request.state.actor_id = str(api_key.id)
+                request.state.actor_type = "api_key"
             return {"actor_type": "api_key", "actor_id": str(api_key.id)}
     raise HTTPException(status_code=401, detail="Unauthorized")
 
@@ -156,6 +159,7 @@ def require_user_auth(
     actor_id = str(person_id)
     if request is not None:
         request.state.actor_id = actor_id
+        request.state.actor_type = "user"
     return {
         "person_id": str(person_id),
         "session_id": str(session_id),
