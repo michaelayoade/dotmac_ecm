@@ -7,11 +7,15 @@ An electronic content management application built on FastAPI with enterprise-gr
 - **Authentication & Security**
   - JWT-based authentication with refresh token rotation
   - Multi-factor authentication (TOTP, SMS, Email)
-  - API key management with rate limiting
+  - API key management with HMAC-SHA256 hashing (keyed secret, constant-time compare)
   - Per-IP rate limiting on auth endpoints (login, MFA, refresh, password reset)
   - Session management with token hashing
-  - Password policies and account lockout
+  - Password policies, account lockout, and single-use password reset tokens
   - Secure-by-default refresh token cookie (`Secure` flag on; override with `REFRESH_COOKIE_SECURE=false` for local dev)
+  - HTTP security headers on every response (X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Referrer-Policy)
+  - CORS policy configurable via `CORS_ALLOW_ORIGINS` environment variable
+  - Avatar upload magic-byte validation (JPEG, PNG, GIF, WebP; HTTP 415 on mismatch)
+  - Protected Prometheus metrics endpoint (Bearer token required)
 
 - **Authorization**
   - Role-based access control (RBAC)
@@ -172,7 +176,7 @@ Services:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql+psycopg://postgres:postgres@localhost:5434/dotmac_ecm` |
+| `DATABASE_URL` | PostgreSQL connection string | Required (dev only: `postgresql+psycopg://localhost:5434/dotmac_ecm`) |
 | `REDIS_URL` | Redis connection string | `redis://:redis@localhost:6379/0` |
 | `CELERY_BROKER_URL` | Celery broker URL | `redis://:redis@localhost:6379/0` |
 | `CELERY_RESULT_BACKEND` | Celery result backend | `redis://:redis@localhost:6379/1` |
@@ -181,6 +185,9 @@ Services:
 | `JWT_ACCESS_TTL_MINUTES` | Access token TTL | `15` |
 | `JWT_REFRESH_TTL_DAYS` | Refresh token TTL | `30` |
 | `REFRESH_COOKIE_SECURE` | Set refresh cookie `Secure` flag | `true` (set `false` for local dev) |
+| `HMAC_SECRET` | HMAC key for API key hashing | Required |
+| `METRICS_API_KEY` | Bearer token for `/metrics` endpoint | Required (endpoint returns 403 if unset) |
+| `CORS_ALLOW_ORIGINS` | Comma-separated list of allowed CORS origins | `""` (empty — no cross-origin requests) |
 | `TOTP_ISSUER` | TOTP issuer name | `dotmac_ecm` |
 | `TOTP_ENCRYPTION_KEY` | TOTP secret encryption key | Required |
 | `OTEL_ENABLED` | Enable OpenTelemetry | `false` |
@@ -248,7 +255,7 @@ OPENBAO_KV_VERSION=2
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/health` | Health check |
-| GET | `/metrics` | Prometheus metrics |
+| GET | `/metrics` | Prometheus metrics (requires `Authorization: Bearer <METRICS_API_KEY>`) |
 
 ## Development
 
