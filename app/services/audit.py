@@ -105,8 +105,8 @@ class AuditEvents(ListResponseMixin):
 
     @staticmethod
     def log_request(db: Session, request: Request, response: Response):
-        actor_type = request.headers.get("x-actor-type", AuditActorType.system.value)
-        actor_id = request.headers.get("x-actor-id")
+        actor_type = getattr(request.state, 'actor_type', AuditActorType.system.value)
+        actor_id = getattr(request.state, 'actor_id', None)
         request_id = request.headers.get("x-request-id")
         entity_id = request.headers.get("x-entity-id")
         ip_address = request.client.host if request.client else None
