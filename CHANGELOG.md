@@ -25,3 +25,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - [Security] Fix HTML injection in password reset email: `person_name`/`display_name` is now wrapped with `html.escape()` before interpolation into the HTML email body, preventing phishing via crafted display names (PR #13)
 - [Security] Fix ILIKE wildcard abuse in document search: `%` and `_` characters in the search query are now escaped before being passed to the ILIKE pattern, preventing expensive full-table scans via wildcard injection (PR #15)
 - [Security] Fix audit log actor_type gap: `require_user_auth` now sets `request.state.actor_type = "user"` and the API-key branch of `require_audit_auth` sets `request.state.actor_type = "api_key"`, so audit records correctly identify non-system actors (PR #16)
+
+### Dependencies
+
+- [Security] Upgrade jinja2 from 3.1.4 to >=3.1.6: fixes CVE-2024-56201 and CVE-2024-56326 (sandbox escape via `__init__.__globals__` and `|attr` filter) (PR #19)
+- [Changed] Upgrade cryptography from 42.0.8 to >=46.0.0: picks up 4 major versions of security patches for certificate validation and memory safety (PR #18)
+- [Changed] Upgrade OpenTelemetry instrumentation packages from beta 0.47b0 to >=0.50b0: moves `opentelemetry-instrumentation-fastapi`, `-sqlalchemy`, and `-celery` from beta to stable releases (PR #17)
+- [Changed] Upgrade httpx from 0.27.0 to >=0.28.0: includes security hardening around redirect handling and SSL certificate verification defaults (PR #20)
