@@ -1,3 +1,4 @@
+import html
 import logging
 import os
 import smtplib
@@ -92,11 +93,12 @@ def send_password_reset_email(
     person_name: str | None = None,
 ) -> bool:
     name = person_name or "there"
+    escaped_name = html.escape(name)
     app_url = _env_value("APP_URL") or "http://localhost:8000"
     reset_link = f"{app_url.rstrip('/')}/auth/reset-password?token={reset_token}"
     subject = "Reset your password"
     body_html = (
-        f"<p>Hi {name},</p>"
+        f"<p>Hi {escaped_name},</p>"
         "<p>Use the link below to reset your password:</p>"
         f'<p><a href="{reset_link}">Reset password</a></p>'
     )
