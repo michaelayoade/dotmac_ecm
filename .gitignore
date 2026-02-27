@@ -37,6 +37,7 @@ env/
 .env
 .env.local
 .env.*.local
+.env.agent-swarm
 
 # Testing
 .pytest_cache/
@@ -73,3 +74,4 @@ poetry.lock
 
 # Docker
 .docker/
+.aider*
