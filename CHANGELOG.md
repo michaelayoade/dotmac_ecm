@@ -35,3 +35,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - [Changed] Upgrade httpx from 0.27.0 to >=0.28.0: includes security hardening around redirect handling and SSL certificate verification defaults (PR #20)
 - [Changed] Upgrade pydantic from 2.7.4 to >=2.10.0 and pydantic-core accordingly: picks up validation fixes and performance improvements from the 2.10.x series (PR #22)
 - [Changed] Upgrade python-dotenv from 1.0.1 to >=1.2.1: aligns with current release and picks up latest fixes (PR #23)
+
+### Added
+
+- [Added] GitHub Actions CI/CD pipeline: lint (ruff), type-check (mypy), tests (pytest with coverage), security scan (bandit), and Docker image build + push to GHCR on pushes to `main` and version tags (commit b34e907)
