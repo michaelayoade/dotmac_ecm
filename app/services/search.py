@@ -27,7 +27,11 @@ class SearchService:
         query = db.query(Document).filter(Document.is_active.is_(True))
 
         if q:
-            pattern = f"%{q}%"
+            # Escape SQL LIKE wildcards to prevent wildcard injection
+            # Two backslashes in Python string creates single backslash in actual string
+            # SQL will interpret the backslash as escaping the wildcard
+            q_escaped = q.replace('%', '\\%').replace('_', '\\_')
+            pattern = f"%{q_escaped}%"
             query = query.filter(
                 Document.title.ilike(pattern)
                 | Document.description.ilike(pattern)
