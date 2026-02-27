@@ -3,16 +3,16 @@ set -euo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 
 # ---- Injected at spawn time ----
-WORKTREE_DIR=/home/dotmac/projects/dotmac_ecm/.worktrees/fix-security-c1-2
+WORKTREE_DIR=/home/dotmac/projects/dotmac_ecm/.worktrees/fix-security-c1-11
 PROJECT_DIR=/home/dotmac/projects/dotmac_ecm
 SCRIPT_DIR=/home/dotmac/.seabone/scripts
 ACTIVE_FILE=/home/dotmac/projects/dotmac_ecm/.seabone/active-tasks.json
-LOG_FILE=/home/dotmac/projects/dotmac_ecm/.seabone/logs/fix-security-c1-2.log
-TASK_ID=fix-security-c1-2
-DESCRIPTION=Fix\ webhook\ SSRF\ in\ app/schemas/webhook.py.\ The\ url\ field\ on\ WebhookEndpointCreate\ \(around\ line\ 12\)\ accepts\ any\ string\ with\ no\ validation\,\ allowing\ SSRF\ attacks.\ Add\ a\ Pydantic\ field_validator\ that\ rejects:\ non-HTTP\(S\)\ schemes\,\ loopback\ addresses\ \(127.x.x.x\,\ ::1\)\,\ link-local\ \(169.254.x.x\)\,\ and\ RFC\ 1918\ private\ IP\ ranges\ \(10.x\,\ 172.16-31.x\,\ 192.168.x\).\ Use\ Python\ stdlib\ ipaddress\ and\ urllib.parse.urlparse\ only\ —\ no\ new\ dependencies.\ Read\ app/schemas/webhook.py\ and\ app/tasks/webhooks.py\ first\ to\ understand\ the\ full\ context.
-BRANCH=agent/fix-security-c1-2
-ENGINE=codex
-MODEL=gpt-5.3-codex
+LOG_FILE=/home/dotmac/projects/dotmac_ecm/.seabone/logs/fix-security-c1-11.log
+TASK_ID=fix-security-c1-11
+DESCRIPTION=Add\ HTTP\ security\ response\ headers\ middleware\ to\ app/main.py\ \(around\ line\ 54\).\ Add\ a\ middleware\ \(use\ BaseHTTPMiddleware\ or\ a\ starlette\ middleware\)\ that\ appends\ these\ headers\ to\ every\ response:\ X-Frame-Options:\ DENY\,\ X-Content-Type-Options:\ nosniff\,\ X-XSS-Protection:\ 1\;\ mode=block\,\ Referrer-Policy:\ strict-origin-when-cross-origin.\ Read\ app/main.py\ to\ understand\ existing\ middleware\ setup\ before\ adding\ the\ new\ middleware.
+BRANCH=agent/fix-security-c1-11
+ENGINE=aider
+MODEL=deepseek-chat
 EVENT_LOG=/home/dotmac/projects/dotmac_ecm/.seabone/logs/events.log
 CONFIG_FILE=/home/dotmac/projects/dotmac_ecm/.seabone/config.json
 PROJECT_NAME=dotmac_ecm
