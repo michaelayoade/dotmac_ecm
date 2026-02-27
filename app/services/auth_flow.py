@@ -8,7 +8,9 @@ from datetime import datetime, timedelta, timezone
 import pyotp
 from cryptography.fernet import Fernet, InvalidToken
 from fastapi import HTTPException, Request, Response, status
-from jose import JWTError, jwt
+from joserfc import jwt
+from joserfc.errors import JoseError
+from joserfc.jwk import OctKey
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -223,7 +225,8 @@ def _issue_access_token(
         payload["roles"] = roles
     if permissions:
         payload["scopes"] = permissions
-    return jwt.encode(payload, _jwt_secret(db), algorithm=_jwt_algorithm(db))
+    key = OctKey.import_key(_jwt_secret(db).encode())
+    return jwt.encode({"alg": _jwt_algorithm(db)}, payload, key)
 
 
 def _issue_mfa_token(db: Session | None, person_id: str) -> str:
@@ -234,7 +237,8 @@ def _issue_mfa_token(db: Session | None, person_id: str) -> str:
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=5)).timestamp()),
     }
-    return jwt.encode(payload, _jwt_secret(db), algorithm=_jwt_algorithm(db))
+    key = OctKey.import_key(_jwt_secret(db).encode())
+    return jwt.encode({"alg": _jwt_algorithm(db)}, payload, key)
 
 
 def _password_reset_ttl_minutes(db: Session | None) -> int:
@@ -261,7 +265,8 @@ def _issue_password_reset_token(db: Session | None, person_id: str, email: str) 
             (now + timedelta(minutes=_password_reset_ttl_minutes(db))).timestamp()
         ),
     }
-    return jwt.encode(payload, _jwt_secret(db), algorithm=_jwt_algorithm(db))
+    key = OctKey.import_key(_jwt_secret(db).encode())
+    return jwt.encode({"alg": _jwt_algorithm(db)}, payload, key)
 
 
 def _decode_password_reset_token(db: Session | None, token: str) -> dict:
@@ -270,8 +275,10 @@ def _decode_password_reset_token(db: Session | None, token: str) -> dict:
 
 def _decode_jwt(db: Session | None, token: str, expected_type: str) -> dict:
     try:
-        payload = jwt.decode(token, _jwt_secret(db), algorithms=[_jwt_algorithm(db)])
-    except JWTError as exc:
+        key = OctKey.import_key(_jwt_secret(db).encode())
+        token_obj = jwt.decode(token, key, algorithms=[_jwt_algorithm(db)])
+        payload = token_obj.claims
+    except JoseError as exc:
         raise HTTPException(status_code=401, detail="Invalid token") from exc
     if payload.get("typ") != expected_type:
         raise HTTPException(status_code=401, detail="Invalid token type")

@@ -3,7 +3,9 @@ import os
 import time
 import uuid
 
-from jose import JWTError, jwt
+from joserfc import jwt
+from joserfc.errors import JoseError
+from joserfc.jwk import OctKey
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
@@ -40,8 +42,10 @@ def _extract_actor_id_from_jwt(token: str | None) -> str | None:
     if not secret:
         return None
     try:
-        payload = jwt.decode(token, secret, algorithms=[_jwt_algorithm()])
-    except JWTError:
+        key = OctKey.import_key(secret.encode())
+        token_obj = jwt.decode(token, key, algorithms=[_jwt_algorithm()])
+        payload = token_obj.claims
+    except JoseError:
         return None
     subject = payload.get("sub")
     if subject:
