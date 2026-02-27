@@ -3,14 +3,14 @@ set -euo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 
 # ---- Injected at spawn time ----
-WORKTREE_DIR=/home/dotmac/projects/dotmac_ecm/.worktrees/fix-security-c1-2
+WORKTREE_DIR=/home/dotmac/projects/dotmac_ecm/.worktrees/fix-security-c1-4
 PROJECT_DIR=/home/dotmac/projects/dotmac_ecm
-SCRIPT_DIR=/home/dotmac/.seabone/scripts
+SCRIPT_DIR=/home/dotmac/projects/dotmac_ecm/scripts
 ACTIVE_FILE=/home/dotmac/projects/dotmac_ecm/.seabone/active-tasks.json
-LOG_FILE=/home/dotmac/projects/dotmac_ecm/.seabone/logs/fix-security-c1-2.log
-TASK_ID=fix-security-c1-2
-DESCRIPTION=Fix\ webhook\ SSRF\ in\ app/schemas/webhook.py.\ The\ url\ field\ on\ WebhookEndpointCreate\ \(around\ line\ 12\)\ accepts\ any\ string\ with\ no\ validation\,\ allowing\ SSRF\ attacks.\ Add\ a\ Pydantic\ field_validator\ that\ rejects:\ non-HTTP\(S\)\ schemes\,\ loopback\ addresses\ \(127.x.x.x\,\ ::1\)\,\ link-local\ \(169.254.x.x\)\,\ and\ RFC\ 1918\ private\ IP\ ranges\ \(10.x\,\ 172.16-31.x\,\ 192.168.x\).\ Use\ Python\ stdlib\ ipaddress\ and\ urllib.parse.urlparse\ only\ —\ no\ new\ dependencies.\ Read\ app/schemas/webhook.py\ and\ app/tasks/webhooks.py\ first\ to\ understand\ the\ full\ context.
-BRANCH=agent/fix-security-c1-2
+LOG_FILE=/home/dotmac/projects/dotmac_ecm/.seabone/logs/fix-security-c1-4.log
+TASK_ID=fix-security-c1-4
+DESCRIPTION=Fix\ password\ reset\ token\ reuse\ in\ app/services/auth_flow.py\ \(around\ line\ 756\).\ After\ a\ successful\ password\ reset\,\ the\ reset\ token\ is\ not\ deleted\ or\ marked\ as\ used\ —\ an\ attacker\ who\ intercepts\ a\ valid\ token\ can\ reuse\ it\ after\ the\ password\ has\ already\ been\ changed.\ Find\ the\ function\ that\ validates\ and\ applies\ the\ reset\ token\ \(look\ for\ password_reset\ or\ similar\ near\ line\ 756\).\ After\ updating\ the\ user\'s\ password\,\ immediately\ delete\ the\ token\ record\ from\ the\ database\ or\ set\ a\ used_at/invalidated_at\ timestamp\ so\ the\ token\ cannot\ be\ reused.\ Check\ app/models/\ for\ the\ PasswordResetToken\ model\ to\ understand\ the\ data\ structure.\ Read\ app/services/auth_flow.py\ fully\ before\ making\ changes.
+BRANCH=agent/fix-security-c1-4
 ENGINE=codex
 MODEL=gpt-5.3-codex
 EVENT_LOG=/home/dotmac/projects/dotmac_ecm/.seabone/logs/events.log
@@ -75,11 +75,13 @@ if [[ "$ENGINE" == "claude" ]]; then
 elif [[ "$ENGINE" == "claude-frontend" ]]; then
     echo "[RUN] Claude Frontend Design Specialist..."
 
+    # Load the frontend design system prompt
     FRONTEND_PROMPT=""
     if [[ -f "$PROMPTS_DIR/frontend-design.md" ]]; then
         FRONTEND_PROMPT=$(cat "$PROMPTS_DIR/frontend-design.md")
     fi
 
+    # Build the full prompt: system context + task
     FULL_TASK="$FRONTEND_PROMPT
 
 ---
@@ -139,6 +141,7 @@ elif [[ "$ENGINE" == "codex" ]]; then
 elif [[ "$ENGINE" == "codex-test" ]]; then
     echo "[RUN] Codex Testing Specialist..."
 
+    # Load the testing system prompt
     TEST_PROMPT=""
     if [[ -f "$PROMPTS_DIR/testing-agent.md" ]]; then
         TEST_PROMPT=$(cat "$PROMPTS_DIR/testing-agent.md")
@@ -181,15 +184,19 @@ ${DESCRIPTION}
 elif [[ "$ENGINE" == "codex-senior" ]]; then
     echo "[RUN] Codex Senior Dev (Escalation)..."
 
+    # Load the senior dev system prompt
     SENIOR_PROMPT=""
     if [[ -f "$PROMPTS_DIR/senior-dev.md" ]]; then
         SENIOR_PROMPT=$(cat "$PROMPTS_DIR/senior-dev.md")
     fi
 
+    # Check for previous agent logs to provide context
     PREV_LOG_CONTEXT=""
+    # Extract base task ID (strip -v2, -v3 suffixes for escalation lookups)
     BASE_TASK_ID=$(echo "$TASK_ID" | sed -E 's/-v[0-9]+$//')
     for prev_log in "$LOG_DIR/${BASE_TASK_ID}"*.log; do
         if [[ -f "$prev_log" && "$prev_log" != "$LOG_FILE" ]]; then
+            # Get last 80 lines of previous attempts
             PREV_LOG_CONTEXT="${PREV_LOG_CONTEXT}
 
 --- Previous attempt log: $(basename "$prev_log") ---

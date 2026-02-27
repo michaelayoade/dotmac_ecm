@@ -17,6 +17,7 @@ from app.models.auth import (
     AuthProvider,
     MFAMethod,
     MFAMethodType,
+    PasswordResetToken,
     Session as AuthSession,
     SessionStatus,
     UserCredential,
@@ -746,6 +747,16 @@ def request_password_reset(db: Session, email: str) -> dict | None:
         return None
 
     token = _issue_password_reset_token(db, str(person.id), email)
+    now = _now()
+    reset_token = PasswordResetToken(
+        person_id=person.id,
+        email=email,
+        token_hash=_hash_token(token),
+        expires_at=now + timedelta(minutes=_password_reset_ttl_minutes(db)),
+    )
+    db.add(reset_token)
+    db.commit()
+
     return {
         "token": token,
         "email": email,
@@ -769,6 +780,19 @@ def reset_password(db: Session, token: str, new_password: str) -> datetime:
     if not person or person.email != email:
         raise HTTPException(status_code=401, detail="Invalid reset token")
 
+    now = _now()
+    reset_token = (
+        db.query(PasswordResetToken)
+        .filter(PasswordResetToken.token_hash == _hash_token(token))
+        .filter(PasswordResetToken.person_id == person.id)
+        .filter(PasswordResetToken.email == email)
+        .filter(PasswordResetToken.used_at.is_(None))
+        .filter(PasswordResetToken.expires_at > now)
+        .first()
+    )
+    if not reset_token:
+        raise HTTPException(status_code=401, detail="Invalid reset token")
+
     credential = (
         db.query(UserCredential)
         .filter(UserCredential.person_id == person.id)
@@ -778,12 +802,12 @@ def reset_password(db: Session, token: str, new_password: str) -> datetime:
     if not credential:
         raise HTTPException(status_code=404, detail="No credentials found")
 
-    now = _now()
     credential.password_hash = hash_password(new_password)
     credential.password_updated_at = now
     credential.must_change_password = False
     credential.failed_login_attempts = 0
     credential.locked_until = None
+    reset_token.used_at = now
     revoke_sessions_for_person(db, str(person.id))
     db.commit()
 

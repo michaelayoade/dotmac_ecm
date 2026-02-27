@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 
 from app.models.auth import (
+    PasswordResetToken,
     Session as AuthSession,
     SessionStatus,
     UserCredential,
@@ -358,6 +359,39 @@ class TestPasswordAPI:
         for session in sessions:
             assert session.status == SessionStatus.revoked
             assert session.revoked_at is not None
+
+    def test_reset_password_token_cannot_be_reused(self, client, db_session, person):
+        """Test reset token is one-time use."""
+        credential = UserCredential(
+            person_id=person.id,
+            username=f"resetreuse_{uuid.uuid4().hex[:8]}",
+            password_hash=hash_password("oldpassword123"),
+            is_active=True,
+        )
+        db_session.add(credential)
+        db_session.commit()
+
+        reset = auth_flow_service.request_password_reset(db_session, person.email)
+        assert reset is not None
+
+        first_payload = {"token": reset["token"], "new_password": "newpassword456"}
+        first_response = client.post("/auth/reset-password", json=first_payload)
+        assert first_response.status_code == 200
+
+        token_record = (
+            db_session.query(PasswordResetToken)
+            .filter(
+                PasswordResetToken.token_hash
+                == auth_flow_service.hash_session_token(reset["token"])
+            )
+            .first()
+        )
+        assert token_record is not None
+        assert token_record.used_at is not None
+
+        second_payload = {"token": reset["token"], "new_password": "newpassword789"}
+        second_response = client.post("/auth/reset-password", json=second_payload)
+        assert second_response.status_code == 401
 
 
 class TestRefreshAPI:
