@@ -3,16 +3,16 @@ set -euo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 
 # ---- Injected at spawn time ----
-WORKTREE_DIR=/home/dotmac/projects/dotmac_ecm/.worktrees/fix-security-c1-1
+WORKTREE_DIR=/home/dotmac/projects/dotmac_ecm/.worktrees/fix-security-c1-5
 PROJECT_DIR=/home/dotmac/projects/dotmac_ecm
 SCRIPT_DIR=/home/dotmac/.seabone/scripts
 ACTIVE_FILE=/home/dotmac/projects/dotmac_ecm/.seabone/active-tasks.json
-LOG_FILE=/home/dotmac/projects/dotmac_ecm/.seabone/logs/fix-security-c1-1.log
-TASK_ID=fix-security-c1-1
-DESCRIPTION=Fix\ audit\ log\ actor\ spoofing\ in\ app/services/audit.py.\ The\ log_request\(\)\ method\ reads\ x-actor-type\ and\ x-actor-id\ from\ raw\ HTTP\ request\ headers\ \(around\ line\ 108-109\)\,\ allowing\ any\ client\ to\ forge\ actor\ identities\ in\ the\ audit\ trail.\ Fix:\ replace\ request.headers.get\(\'x-actor-type\'\,\ ...\)\ and\ request.headers.get\(\'x-actor-id\'\)\ with\ values\ from\ request.state\ using\ getattr\(request.state\,\ \'actor_type\'\,\ AuditActorType.system.value\)\ and\ getattr\(request.state\,\ \'actor_id\'\,\ None\).\ Read\ the\ file\ first\ to\ understand\ the\ full\ context\ before\ making\ changes.
-BRANCH=agent/fix-security-c1-1
-ENGINE=codex
-MODEL=gpt-5.3-codex
+LOG_FILE=/home/dotmac/projects/dotmac_ecm/.seabone/logs/fix-security-c1-5.log
+TASK_ID=fix-security-c1-5
+DESCRIPTION=Add\ .env.agent-swarm\ to\ .gitignore.\ Open\ /home/dotmac/projects/dotmac_ecm/.gitignore\ and\ add\ the\ line\ \'.env.agent-swarm\'\ under\ the\ \'Environment\ variables\'\ section.\ This\ file\ contains\ live\ API\ credentials\ and\ must\ not\ be\ committed.\ Make\ only\ this\ one\ change.
+BRANCH=agent/fix-security-c1-5
+ENGINE=aider
+MODEL=deepseek-chat
 EVENT_LOG=/home/dotmac/projects/dotmac_ecm/.seabone/logs/events.log
 CONFIG_FILE=/home/dotmac/projects/dotmac_ecm/.seabone/config.json
 PROJECT_NAME=dotmac_ecm
