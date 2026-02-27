@@ -50,6 +50,33 @@ class TestWebhookEndpointEndpoints:
         data = resp.json()
         assert data["name"] == "My Hook"
 
+    @pytest.mark.parametrize(
+        "bad_url",
+        [
+            "ftp://example.com/hook",
+            "http://127.0.0.1/hook",
+            "http://[::1]/hook",
+            "http://169.254.169.254/hook",
+            "http://10.0.0.1/hook",
+            "http://172.16.1.1/hook",
+            "http://192.168.1.1/hook",
+        ],
+    )
+    def test_create_rejects_ssrf_targets(
+        self, client, auth_headers, person, bad_url: str
+    ) -> None:
+        resp = client.post(
+            "/webhooks/endpoints",
+            json={
+                "name": "Blocked Hook",
+                "url": bad_url,
+                "event_types": ["document"],
+                "created_by": str(person.id),
+            },
+            headers=auth_headers,
+        )
+        assert resp.status_code == 422
+
     def test_get(self, client, auth_headers, webhook_endpoint) -> None:
         resp = client.get(
             f"/webhooks/endpoints/{webhook_endpoint.id}", headers=auth_headers
@@ -74,6 +101,28 @@ class TestWebhookEndpointEndpoints:
         )
         assert resp.status_code == 200
         assert resp.json()["name"] == "Updated Hook"
+
+    @pytest.mark.parametrize(
+        "bad_url",
+        [
+            "ftp://example.com/hook",
+            "http://127.0.0.1/hook",
+            "http://[::1]/hook",
+            "http://169.254.169.254/hook",
+            "http://10.0.0.1/hook",
+            "http://172.16.1.1/hook",
+            "http://192.168.1.1/hook",
+        ],
+    )
+    def test_update_rejects_ssrf_targets(
+        self, client, auth_headers, webhook_endpoint, bad_url: str
+    ) -> None:
+        resp = client.patch(
+            f"/webhooks/endpoints/{webhook_endpoint.id}",
+            json={"url": bad_url},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 422
 
     def test_delete(self, client, auth_headers, webhook_endpoint) -> None:
         resp = client.delete(
