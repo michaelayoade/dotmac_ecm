@@ -1,6 +1,8 @@
 from contextlib import asynccontextmanager
+import os
+import hmac
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Request, HTTPException, status
 from time import monotonic
 from threading import Lock
 from starlette.responses import Response
@@ -218,7 +220,50 @@ def health_check():
     return {"status": "ok"}
 
 
+def require_metrics_api_key(request: Request):
+    """Dependency to check METRICS_API_KEY from Authorization header."""
+    metrics_api_key = os.environ.get("METRICS_API_KEY")
+    
+    # If METRICS_API_KEY is not set, always return 403
+    if not metrics_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden"
+        )
+    
+    # Get Authorization header
+    auth_header = request.headers.get("Authorization")
+    if not auth_header:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing Authorization header",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Check if it's a Bearer token
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication scheme",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Extract the token
+    token = auth_header[7:]  # Remove "Bearer " prefix
+    
+    # Use constant-time comparison to prevent timing attacks
+    if not hmac.compare_digest(token, metrics_api_key):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Authentication successful
+    return True
+
+
 @app.get("/metrics")
-def metrics():
+def metrics(_: bool = Depends(require_metrics_api_key)):
     data = generate_latest()
     return Response(content=data, media_type=CONTENT_TYPE_LATEST)
