@@ -8,6 +8,7 @@ from threading import Lock
 from starlette.responses import Response
 from fastapi.staticfiles import StaticFiles
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.audit import router as audit_router
 from app.api.auth import router as auth_router
@@ -54,6 +55,19 @@ _AUDIT_SETTINGS_LOCK = Lock()
 configure_logging()
 setup_otel(app)
 app.add_middleware(ObservabilityMiddleware)
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
 register_error_handlers(app)
 
 
