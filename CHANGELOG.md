@@ -28,7 +28,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Dependencies
 
+- [Security] Replace python-jose 3.3.0 with joserfc >=0.12.0: fixes CVE-2024-33664 and CVE-2024-33663 (algorithm confusion attack allowing JWT signature bypass via algorithm switching); all JWT encode/decode paths migrated to joserfc with explicit `algorithms` kwarg to reject `none` algorithm (PR #24)
 - [Security] Upgrade jinja2 from 3.1.4 to >=3.1.6: fixes CVE-2024-56201 and CVE-2024-56326 (sandbox escape via `__init__.__globals__` and `|attr` filter) (PR #19)
 - [Changed] Upgrade cryptography from 42.0.8 to >=46.0.0: picks up 4 major versions of security patches for certificate validation and memory safety (PR #18)
 - [Changed] Upgrade OpenTelemetry instrumentation packages from beta 0.47b0 to >=0.50b0: moves `opentelemetry-instrumentation-fastapi`, `-sqlalchemy`, and `-celery` from beta to stable releases (PR #17)
 - [Changed] Upgrade httpx from 0.27.0 to >=0.28.0: includes security hardening around redirect handling and SSL certificate verification defaults (PR #20)
+- [Changed] Upgrade pydantic from 2.7.4 to >=2.10.0 and pydantic-core accordingly: picks up validation fixes and performance improvements from the 2.10.x series (PR #22)
+- [Changed] Upgrade python-dotenv from 1.0.1 to >=1.2.1: aligns with current release and picks up latest fixes (PR #23)
