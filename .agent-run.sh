@@ -3,14 +3,14 @@ set -euo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 
 # ---- Injected at spawn time ----
-WORKTREE_DIR=/home/dotmac/projects/dotmac_ecm/.worktrees/fix-security-c1-16
+WORKTREE_DIR=/home/dotmac/projects/dotmac_ecm/.worktrees/fix-deps-5
 PROJECT_DIR=/home/dotmac/projects/dotmac_ecm
 SCRIPT_DIR=/home/dotmac/projects/dotmac_ecm/scripts
 ACTIVE_FILE=/home/dotmac/projects/dotmac_ecm/.seabone/active-tasks.json
-LOG_FILE=/home/dotmac/projects/dotmac_ecm/.seabone/logs/fix-security-c1-16.log
-TASK_ID=fix-security-c1-16
-DESCRIPTION=Fix\ missing\ actor_type\ in\ audit\ logging\ in\ app/services/auth_dependencies.py\ \(around\ line\ 157\).\ The\ require_user_auth\ and\ require_audit_auth\ dependencies\ set\ request.state.actor_id\ but\ never\ set\ request.state.actor_type.\ As\ a\ result\,\ the\ audit\ logger\ always\ records\ actor_type=\'system\'\ even\ for\ authenticated\ user\ and\ API-key\ requests\,\ making\ audit\ logs\ unreliable.\ Fix:\ in\ require_user_auth\,\ add\ \'request.state.actor_type\ =\ \"user\"\'\ immediately\ after\ setting\ actor_id.\ In\ the\ API-key\ branch\ of\ require_audit_auth\,\ add\ \'request.state.actor_type\ =\ \"api_key\"\'.\ Read\ app/services/auth_dependencies.py\ fully\ before\ making\ changes.
-BRANCH=agent/fix-security-c1-16
+LOG_FILE=/home/dotmac/projects/dotmac_ecm/.seabone/logs/fix-deps-5.log
+TASK_ID=fix-deps-5
+DESCRIPTION=Upgrade\ OpenTelemetry\ instrumentation\ packages\ from\ beta\ 0.47b0\ to\ stable\ releases\ in\ pyproject.toml.\ Update:\ opentelemetry-instrumentation-fastapi\,\ opentelemetry-instrumentation-sqlalchemy\,\ opentelemetry-instrumentation-celery\ to\ \>=0.50b0\ \(latest\ stable\).\ Run\ \'poetry\ lock\ --no-update\'\ to\ refresh\ the\ lock\ file.
+BRANCH=agent/fix-deps-5
 ENGINE=aider
 MODEL=deepseek-chat
 EVENT_LOG=/home/dotmac/projects/dotmac_ecm/.seabone/logs/events.log
@@ -27,8 +27,13 @@ source "$SCRIPT_DIR/json-lock.sh"
 
 log_event() {
     local event="$1" status="$2" detail="$3"
-    local ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    printf '%s\n' "$(jq -n --arg ts "$ts" --arg project "$PROJECT_NAME" --arg task_id "$TASK_ID" --arg event "$event" --arg status "$status" --arg detail "$detail" '{ts:$ts,project:$project,task_id:$task_id,event:$event,status:$status,detail:$detail}')" >> "$EVENT_LOG"
+    local ts project_slug
+    ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    project_slug="${PROJECT_NAME:-}"
+    if [[ -z "$project_slug" || "$project_slug" == */* ]]; then
+        project_slug="$(basename "$PROJECT_DIR")"
+    fi
+    printf '%s\n' "$(jq -n --arg ts "$ts" --arg project "$project_slug" --arg task_id "$TASK_ID" --arg event "$event" --arg status "$status" --arg detail "$detail" '{ts:$ts,project:$project,task_id:$task_id,event:$event,status:$status,detail:$detail}')" >> "$EVENT_LOG"
 }
 
 set_status() {
@@ -242,29 +247,36 @@ ${PREV_LOG_CONTEXT:-No previous attempts — this is a first escalation.}
 elif [[ "$ENGINE" == "aider" ]]; then
     echo "[RUN] Aider + DeepSeek..."
 
-    export OPENAI_API_KEY="${DEEPSEEK_API_KEY}"
-    export OPENAI_API_BASE="https://api.deepseek.com"
+    if [[ -n "${DEEPSEEK_API_KEY:-}" ]]; then
+        export OPENAI_API_KEY="${OPENAI_API_KEY:-$DEEPSEEK_API_KEY}"
+        export OPENAI_API_BASE="${OPENAI_API_BASE:-https://api.deepseek.com}"
+    fi
 
     cp "$PROJECT_DIR/.aider.model.settings.yml" "$WORKTREE_DIR/" 2>/dev/null || true
     cp "$PROJECT_DIR/.aider.model.metadata.json" "$WORKTREE_DIR/" 2>/dev/null || true
     cp "$PROJECT_DIR/.aider.conf.yml" "$WORKTREE_DIR/" 2>/dev/null || true
     cp "$PROJECT_DIR/.aiderignore" "$WORKTREE_DIR/" 2>/dev/null || true
 
-    aider --model "openai/$MODEL" \
-        --no-auto-commits \
-        --yes-always \
-        --no-show-model-warnings \
-        --no-detect-urls \
-        --subtree-only \
-        --map-tokens 1024 \
-        --model-settings-file "$WORKTREE_DIR/.aider.model.settings.yml" \
-        --model-metadata-file "$WORKTREE_DIR/.aider.model.metadata.json" \
-        --message "$DESCRIPTION" \
-        2>&1 | tee -a "$LOG_FILE"
-    AGENT_EXIT=${PIPESTATUS[0]}
+    if [[ -z "${OPENAI_API_KEY:-}" ]]; then
+        echo "[ERROR] OPENAI_API_KEY is not set. Configure OPENAI_API_KEY or DEEPSEEK_API_KEY in .env.agent-swarm." | tee -a "$LOG_FILE"
+        AGENT_EXIT=2
+    else
+        aider --model "openai/$MODEL" \
+            --no-auto-commits \
+            --yes-always \
+            --no-show-model-warnings \
+            --no-detect-urls \
+            --subtree-only \
+            --map-tokens 1024 \
+            --model-settings-file "$WORKTREE_DIR/.aider.model.settings.yml" \
+            --model-metadata-file "$WORKTREE_DIR/.aider.model.metadata.json" \
+            --message "$DESCRIPTION" \
+            2>&1 | tee -a "$LOG_FILE"
+        AGENT_EXIT=${PIPESTATUS[0]}
+    fi
 
     # Self-review loop for aider only
-    if [[ $AGENT_EXIT -eq 0 ]]; then
+    if [[ $AGENT_EXIT -eq 0 && -n "${DEEPSEEK_API_KEY:-}" ]]; then
         cd "$WORKTREE_DIR"
         if ! git diff --quiet || ! git diff --cached --quiet; then
             for cycle in 1 2; do
