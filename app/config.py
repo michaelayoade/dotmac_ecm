@@ -6,12 +6,24 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def _resolve_database_url() -> str:
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        return database_url
+
+    environment = os.getenv("ENVIRONMENT", "").strip().lower()
+    if environment == "development":
+        return "postgresql+psycopg://localhost:5434/dotmac_ecm"
+
+    raise ValueError(
+        "DATABASE_URL is not set. Set DATABASE_URL for non-development "
+        "environments or set ENVIRONMENT=development for local defaults."
+    )
+
+
 @dataclass(frozen=True)
 class Settings:
-    database_url: str = os.getenv(
-        "DATABASE_URL",
-        "postgresql+psycopg://postgres:postgres@localhost:5434/dotmac_ecm",
-    )
+    database_url: str = _resolve_database_url()
     db_pool_size: int = int(os.getenv("DB_POOL_SIZE", "5"))
     db_max_overflow: int = int(os.getenv("DB_MAX_OVERFLOW", "10"))
     db_pool_timeout: int = int(os.getenv("DB_POOL_TIMEOUT", "30"))
