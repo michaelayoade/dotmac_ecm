@@ -3,16 +3,16 @@ set -euo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 
 # ---- Injected at spawn time ----
-WORKTREE_DIR=/home/dotmac/projects/dotmac_ecm/.worktrees/fix-security-c1-2
+WORKTREE_DIR=/home/dotmac/projects/dotmac_ecm/.worktrees/fix-security-c1-15
 PROJECT_DIR=/home/dotmac/projects/dotmac_ecm
-SCRIPT_DIR=/home/dotmac/.seabone/scripts
+SCRIPT_DIR=/home/dotmac/projects/dotmac_ecm/scripts
 ACTIVE_FILE=/home/dotmac/projects/dotmac_ecm/.seabone/active-tasks.json
-LOG_FILE=/home/dotmac/projects/dotmac_ecm/.seabone/logs/fix-security-c1-2.log
-TASK_ID=fix-security-c1-2
-DESCRIPTION=Fix\ webhook\ SSRF\ in\ app/schemas/webhook.py.\ The\ url\ field\ on\ WebhookEndpointCreate\ \(around\ line\ 12\)\ accepts\ any\ string\ with\ no\ validation\,\ allowing\ SSRF\ attacks.\ Add\ a\ Pydantic\ field_validator\ that\ rejects:\ non-HTTP\(S\)\ schemes\,\ loopback\ addresses\ \(127.x.x.x\,\ ::1\)\,\ link-local\ \(169.254.x.x\)\,\ and\ RFC\ 1918\ private\ IP\ ranges\ \(10.x\,\ 172.16-31.x\,\ 192.168.x\).\ Use\ Python\ stdlib\ ipaddress\ and\ urllib.parse.urlparse\ only\ —\ no\ new\ dependencies.\ Read\ app/schemas/webhook.py\ and\ app/tasks/webhooks.py\ first\ to\ understand\ the\ full\ context.
-BRANCH=agent/fix-security-c1-2
-ENGINE=codex
-MODEL=gpt-5.3-codex
+LOG_FILE=/home/dotmac/projects/dotmac_ecm/.seabone/logs/fix-security-c1-15.log
+TASK_ID=fix-security-c1-15
+DESCRIPTION=Fix\ ILIKE\ wildcard\ abuse\ in\ app/services/search.py\ \(around\ line\ 30\).\ The\ document\ search\ builds\ an\ ILIKE\ pattern\ with\ f\"%\{q\}%\"\ where\ q\ is\ raw\ user\ input.\ Authenticated\ users\ can\ include\ unescaped\ %\ and\ _\ wildcards\ in\ their\ search\ query\,\ forcing\ expensive\ full-table\ scans\ and\ degrading\ database\ performance.\ Fix:\ before\ building\ the\ ILIKE\ pattern\,\ escape\ wildcards\ in\ q:\ q_escaped\ =\ q.replace\(\'%\'\,\ \'\\\\%\'\).replace\(\'_\'\,\ \'\\\\_\'\)\ and\ then\ use\ f\"%\{q_escaped\}%\"\ in\ the\ ILIKE\ call.\ Read\ app/services/search.py\ fully\ before\ making\ changes.
+BRANCH=agent/fix-security-c1-15
+ENGINE=aider
+MODEL=deepseek-chat
 EVENT_LOG=/home/dotmac/projects/dotmac_ecm/.seabone/logs/events.log
 CONFIG_FILE=/home/dotmac/projects/dotmac_ecm/.seabone/config.json
 PROJECT_NAME=dotmac_ecm
@@ -75,11 +75,13 @@ if [[ "$ENGINE" == "claude" ]]; then
 elif [[ "$ENGINE" == "claude-frontend" ]]; then
     echo "[RUN] Claude Frontend Design Specialist..."
 
+    # Load the frontend design system prompt
     FRONTEND_PROMPT=""
     if [[ -f "$PROMPTS_DIR/frontend-design.md" ]]; then
         FRONTEND_PROMPT=$(cat "$PROMPTS_DIR/frontend-design.md")
     fi
 
+    # Build the full prompt: system context + task
     FULL_TASK="$FRONTEND_PROMPT
 
 ---
@@ -139,6 +141,7 @@ elif [[ "$ENGINE" == "codex" ]]; then
 elif [[ "$ENGINE" == "codex-test" ]]; then
     echo "[RUN] Codex Testing Specialist..."
 
+    # Load the testing system prompt
     TEST_PROMPT=""
     if [[ -f "$PROMPTS_DIR/testing-agent.md" ]]; then
         TEST_PROMPT=$(cat "$PROMPTS_DIR/testing-agent.md")
@@ -181,15 +184,19 @@ ${DESCRIPTION}
 elif [[ "$ENGINE" == "codex-senior" ]]; then
     echo "[RUN] Codex Senior Dev (Escalation)..."
 
+    # Load the senior dev system prompt
     SENIOR_PROMPT=""
     if [[ -f "$PROMPTS_DIR/senior-dev.md" ]]; then
         SENIOR_PROMPT=$(cat "$PROMPTS_DIR/senior-dev.md")
     fi
 
+    # Check for previous agent logs to provide context
     PREV_LOG_CONTEXT=""
+    # Extract base task ID (strip -v2, -v3 suffixes for escalation lookups)
     BASE_TASK_ID=$(echo "$TASK_ID" | sed -E 's/-v[0-9]+$//')
     for prev_log in "$LOG_DIR/${BASE_TASK_ID}"*.log; do
         if [[ -f "$prev_log" && "$prev_log" != "$LOG_FILE" ]]; then
+            # Get last 80 lines of previous attempts
             PREV_LOG_CONTEXT="${PREV_LOG_CONTEXT}
 
 --- Previous attempt log: $(basename "$prev_log") ---
