@@ -8,8 +8,10 @@ An electronic content management application built on FastAPI with enterprise-gr
   - JWT-based authentication with refresh token rotation
   - Multi-factor authentication (TOTP, SMS, Email)
   - API key management with rate limiting
+  - Per-IP rate limiting on auth endpoints (login, MFA, refresh, password reset)
   - Session management with token hashing
   - Password policies and account lockout
+  - Secure-by-default refresh token cookie (`Secure` flag on; override with `REFRESH_COOKIE_SECURE=false` for local dev)
 
 - **Authorization**
   - Role-based access control (RBAC)
@@ -178,6 +180,7 @@ Services:
 | `JWT_ALGORITHM` | JWT algorithm | `HS256` |
 | `JWT_ACCESS_TTL_MINUTES` | Access token TTL | `15` |
 | `JWT_REFRESH_TTL_DAYS` | Refresh token TTL | `30` |
+| `REFRESH_COOKIE_SECURE` | Set refresh cookie `Secure` flag | `true` (set `false` for local dev) |
 | `TOTP_ISSUER` | TOTP issuer name | `dotmac_ecm` |
 | `TOTP_ENCRYPTION_KEY` | TOTP secret encryption key | Required |
 | `OTEL_ENABLED` | Enable OpenTelemetry | `false` |
