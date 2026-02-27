@@ -1,3 +1,4 @@
+import hmac
 from datetime import datetime, timezone
 
 from fastapi import Depends, Header, HTTPException, Request
@@ -104,18 +105,19 @@ def require_audit_auth(
                 request.state.actor_id = str(session.person_id)
             return {"actor_type": "user", "actor_id": str(session.person_id)}
     if x_api_key:
-        api_key = (
+        incoming_key_hash = hash_api_key(x_api_key)
+        api_keys = (
             db.query(ApiKey)
-            .filter(ApiKey.key_hash == hash_api_key(x_api_key))
             .filter(ApiKey.is_active.is_(True))
             .filter(ApiKey.revoked_at.is_(None))
             .filter((ApiKey.expires_at.is_(None)) | (ApiKey.expires_at > now))
-            .first()
+            .all()
         )
-        if api_key:
-            if request is not None:
-                request.state.actor_id = str(api_key.id)
-            return {"actor_type": "api_key", "actor_id": str(api_key.id)}
+        for api_key in api_keys:
+            if hmac.compare_digest(api_key.key_hash, incoming_key_hash):
+                if request is not None:
+                    request.state.actor_id = str(api_key.id)
+                return {"actor_type": "api_key", "actor_id": str(api_key.id)}
     raise HTTPException(status_code=401, detail="Unauthorized")
 
 

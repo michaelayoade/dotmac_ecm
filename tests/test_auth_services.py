@@ -1,5 +1,3 @@
-import hashlib
-
 import pytest
 from fastapi import HTTPException
 
@@ -119,7 +117,7 @@ def test_api_key_generate_with_redis(monkeypatch, db_session):
     result = auth_service.api_keys.generate_with_rate_limit(db_session, payload, None)
     raw_key = result["key"]
     api_key = result["api_key"]
-    assert hashlib.sha256(raw_key.encode("utf-8")).hexdigest() == api_key.key_hash
+    assert auth_service.hash_api_key(raw_key) == api_key.key_hash
 
 
 def test_api_key_rate_limit_requires_redis(monkeypatch, db_session):

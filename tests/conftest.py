@@ -57,6 +57,7 @@ class MockSettings:
     brand_name = "DotMac ECM"
     brand_tagline = "Electronic Content Management"
     brand_logo_url = None
+    hmac_secret = "test-hmac-secret"
 
 
 mock_config_module.settings = MockSettings()

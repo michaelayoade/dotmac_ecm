@@ -6,6 +6,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def _required_env(name: str) -> str:
+    value = os.getenv(name)
+    if value:
+        return value
+    raise RuntimeError(f"Missing required environment variable: {name}")
+
+
 @dataclass(frozen=True)
 class Settings:
     database_url: str = os.getenv(
@@ -39,6 +46,7 @@ class Settings:
     brand_name: str = os.getenv("BRAND_NAME", "DotMac ECM")
     brand_tagline: str = os.getenv("BRAND_TAGLINE", "Electronic Content Management")
     brand_logo_url: str | None = os.getenv("BRAND_LOGO_URL") or None
+    hmac_secret: str = _required_env("HMAC_SECRET")
 
 
 settings = Settings()

@@ -175,6 +175,7 @@ Services:
 | `CELERY_BROKER_URL` | Celery broker URL | `redis://:redis@localhost:6379/0` |
 | `CELERY_RESULT_BACKEND` | Celery result backend | `redis://:redis@localhost:6379/1` |
 | `JWT_SECRET` | JWT signing secret | Required |
+| `HMAC_SECRET` | HMAC secret used for API key hashing | Required |
 | `JWT_ALGORITHM` | JWT algorithm | `HS256` |
 | `JWT_ACCESS_TTL_MINUTES` | Access token TTL | `15` |
 | `JWT_REFRESH_TTL_DAYS` | Refresh token TTL | `30` |
@@ -190,6 +191,7 @@ Secrets can be resolved from OpenBao by using the `openbao://` prefix:
 
 ```bash
 JWT_SECRET=openbao://secret/data/dotmac_ecm#jwt_secret
+HMAC_SECRET=openbao://secret/data/dotmac_ecm#hmac_secret
 ```
 
 Configure OpenBao connection:

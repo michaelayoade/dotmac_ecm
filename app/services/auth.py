@@ -1,3 +1,4 @@
+import hmac
 import hashlib
 import os
 import secrets
@@ -34,6 +35,7 @@ from app.schemas.auth import (
     UserCredentialCreate,
     UserCredentialUpdate,
 )
+from app.config import settings
 
 
 def _apply_ordering(query, order_by, order_dir, allowed_columns):
@@ -53,7 +55,11 @@ def _apply_pagination(query, limit, offset):
 
 
 def hash_api_key(value: str) -> str:
-    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+    return hmac.new(
+        settings.hmac_secret.encode("utf-8"),
+        value.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
 
 
 _API_KEY_WINDOW_SECONDS = 60

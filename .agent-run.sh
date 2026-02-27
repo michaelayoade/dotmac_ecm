@@ -3,14 +3,14 @@ set -euo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 
 # ---- Injected at spawn time ----
-WORKTREE_DIR=/home/dotmac/projects/dotmac_ecm/.worktrees/fix-security-c1-2
+WORKTREE_DIR=/home/dotmac/projects/dotmac_ecm/.worktrees/fix-security-c1-8
 PROJECT_DIR=/home/dotmac/projects/dotmac_ecm
 SCRIPT_DIR=/home/dotmac/.seabone/scripts
 ACTIVE_FILE=/home/dotmac/projects/dotmac_ecm/.seabone/active-tasks.json
-LOG_FILE=/home/dotmac/projects/dotmac_ecm/.seabone/logs/fix-security-c1-2.log
-TASK_ID=fix-security-c1-2
-DESCRIPTION=Fix\ webhook\ SSRF\ in\ app/schemas/webhook.py.\ The\ url\ field\ on\ WebhookEndpointCreate\ \(around\ line\ 12\)\ accepts\ any\ string\ with\ no\ validation\,\ allowing\ SSRF\ attacks.\ Add\ a\ Pydantic\ field_validator\ that\ rejects:\ non-HTTP\(S\)\ schemes\,\ loopback\ addresses\ \(127.x.x.x\,\ ::1\)\,\ link-local\ \(169.254.x.x\)\,\ and\ RFC\ 1918\ private\ IP\ ranges\ \(10.x\,\ 172.16-31.x\,\ 192.168.x\).\ Use\ Python\ stdlib\ ipaddress\ and\ urllib.parse.urlparse\ only\ —\ no\ new\ dependencies.\ Read\ app/schemas/webhook.py\ and\ app/tasks/webhooks.py\ first\ to\ understand\ the\ full\ context.
-BRANCH=agent/fix-security-c1-2
+LOG_FILE=/home/dotmac/projects/dotmac_ecm/.seabone/logs/fix-security-c1-8.log
+TASK_ID=fix-security-c1-8
+DESCRIPTION=Fix\ API\ key\ hashing\ in\ app/services/auth.py\ \(around\ line\ 55\).\ API\ keys\ use\ unsalted\ SHA-256\ \(hashlib.sha256\).\ Replace\ with\ HMAC-SHA256:\ add\ an\ HMAC_SECRET\ env\ var\ to\ app/config.py\ \(required\,\ no\ default\)\,\ then\ update\ hash_api_key\(\)\ to\ use\ hmac.new\(secret.encode\(\)\,\ api_key.encode\(\)\,\ hashlib.sha256\).hexdigest\(\).\ Update\ the\ corresponding\ lookup/verify\ code\ to\ use\ hmac.compare_digest\ for\ constant-time\ comparison.\ Read\ app/services/auth.py\ and\ app/config.py\ fully\ before\ making\ changes.
+BRANCH=agent/fix-security-c1-8
 ENGINE=codex
 MODEL=gpt-5.3-codex
 EVENT_LOG=/home/dotmac/projects/dotmac_ecm/.seabone/logs/events.log
