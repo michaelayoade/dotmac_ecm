@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased] — 2026-02-28
+
+### Added
+
+- [Added] GitHub Actions CI workflow: runs on push/PR to `main`; steps include dependency install, `ruff` lint, `mypy` type-check, and `pytest` test suite with PostgreSQL service container (commit b34e907)
+
+---
+
 ## [Unreleased] — 2026-02-27
 
 ### Security
