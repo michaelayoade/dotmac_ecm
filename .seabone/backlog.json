@@ -1,0 +1,28 @@
+[
+  {
+    "id": "ecm-fix-ci",
+    "finding_date": "2026-02-28",
+    "severity": "high",
+    "category": "quality",
+    "task": "Fix CI failures in dotmac_ecm. Check and fix all failing workflow steps.",
+    "engine": "aider",
+    "priority_score": 90,
+    "track": "quality",
+    "status": "pending",
+    "attempt_count": 0,
+    "estimated_effort": 3
+  },
+  {
+    "id": "ecm-add-ghcr",
+    "finding_date": "2026-02-28",
+    "severity": "medium",
+    "category": "feature",
+    "task": "Add GHCR Docker build+push workflow to dotmac_ecm. Copy the pattern from dotmac-platform/.github/workflows/ci.yml (Build & Push Docker Image job). Adapt image name to ghcr.io/michaelayoade/dotmac_ecm.",
+    "engine": "aider",
+    "priority_score": 60,
+    "track": "quality",
+    "status": "pending",
+    "attempt_count": 0,
+    "estimated_effort": 2
+  }
+]
