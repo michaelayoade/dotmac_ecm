@@ -1,0 +1,123 @@
+[
+  {
+    "id": "api-c7-1",
+    "severity": "high",
+    "category": "api",
+    "file": "app/api/auth_flow.py",
+    "line": 479,
+    "issue": "POST /auth/me/password (change_password) has no rate-limiting dependency, so an attacker holding a valid JWT can submit unlimited current_password guesses against the verify_password check without triggering a 429.",
+    "task": "Add Depends(_rate_limit_dependency(\"change_password\", 5)) to the endpoint decorator, consistent with the rate limits already applied to /login, /mfa/verify, /refresh, and /forgot-password.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "api-c7-2",
+    "severity": "high",
+    "category": "api",
+    "file": "app/api/auth_flow.py",
+    "line": 381,
+    "issue": "GET /auth/me/sessions loads all active sessions for the user via .all() with no limit/offset parameters; a user with thousands of sessions causes unbounded memory growth in a single request.",
+    "task": "Add limit and offset Query parameters (e.g. limit: int = Query(default=50, ge=1, le=200), offset: int = Query(default=0, ge=0)), apply .limit().offset() before .all(), and return a total count from a separate .count() query.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "api-c7-3",
+    "severity": "high",
+    "category": "api",
+    "file": "app/api/ecm_retention.py",
+    "line": 186,
+    "issue": "POST /ecm/document-retentions/{retention_id}/dispose takes disposed_by from the request body (DisposeRequest.disposed_by) rather than the authenticated user context, allowing any user to record a disposal as any other person_id.",
+    "task": "Remove disposed_by from DisposeRequest and instead derive it from the authenticated user via require_user_auth; pass auth[\"person_id\"] to document_retentions.dispose() so the acting identity is authoritative.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "api-c7-4",
+    "severity": "medium",
+    "category": "api",
+    "file": "app/api/auth_flow.py",
+    "line": 461,
+    "issue": "DELETE /auth/me/sessions (revoke_all_other_sessions) loads all active sessions into memory via .all() and updates each row individually in a Python loop, causing N ORM dirty-checks and commits for users with many sessions.",
+    "task": "Replace the load-then-loop pattern with a single bulk UPDATE: db.query(AuthSession).filter(...).update({'status': SessionStatus.revoked, 'revoked_at': now}, synchronize_session=False) to push the work to the database in one query.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "api-c7-5",
+    "severity": "medium",
+    "category": "api",
+    "file": "app/api/audit.py",
+    "line": 64,
+    "issue": "DELETE /audit-events/{event_id} permanently removes audit records from the database; audit trails must be immutable for regulatory compliance (SOX, ISO 27001), and hard deletion defeats tamper-evidence guarantees.",
+    "task": "Change the delete_audit_event endpoint to perform a soft-delete only (set is_active=False, add deleted_at timestamp) and add a comment explaining why hard deletion is disallowed; remove the underlying service hard-delete or gate it behind a superadmin role.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "api-c7-6",
+    "severity": "medium",
+    "category": "api",
+    "file": "app/api/search.py",
+    "line": 42,
+    "issue": "GET /search returns count=len(items) which equals the current page size rather than the total number of matching documents, making pagination metadata incorrect for clients (same pattern as api-c3-7 and api-c3-8 but not yet fixed in search.py).",
+    "task": "Issue a separate COUNT query in SearchService.search() (or a new SearchService.count() method) before applying limit/offset, then return the total as the count field in the response dict.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "api-c7-7",
+    "severity": "medium",
+    "category": "api",
+    "file": "app/api/settings.py",
+    "line": 37,
+    "issue": "PUT /settings/auth/{key}, PUT /settings/audit/{key}, and PUT /settings/scheduler/{key} accept any free-form string as the key path parameter with no allowlist validation, enabling creation or accidental overwrite of arbitrary domain-settings keys not defined in the seed data.",
+    "task": "Add a per-domain Literal[] or Enum type for the key path parameter (e.g. AuthSettingKey, AuditSettingKey, SchedulerSettingKey) derived from the seed dictionaries, so that unrecognised key values return 422 rather than silently creating bogus settings rows.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "api-c7-8",
+    "severity": "medium",
+    "category": "api",
+    "file": "app/api/auth.py",
+    "line": 25,
+    "issue": "Across all routers (auth, rbac, persons, scheduler, notifications, webhooks, settings, audit, search, ecm_*), GET/{id}, PATCH/{id}, and DELETE/{id} endpoints declare no responses={404: {\"model\": ErrorResponse}} annotation, leaving the 404 error contract undocumented in OpenAPI; only auth_flow.py endpoints document error responses consistently.",
+    "task": "Add responses={404: {\"model\": ErrorResponse}} (and 400/409 where applicable) to every GET-by-id, PATCH, and DELETE endpoint across all routers, referencing the existing ErrorResponse schema from app/schemas/auth_flow.py.",
+    "auto_fixable": false,
+    "effort": "medium"
+  },
+  {
+    "id": "api-c7-9",
+    "severity": "low",
+    "category": "api",
+    "file": "app/api/ecm_checkouts.py",
+    "line": 35,
+    "issue": "POST /ecm/documents/{document_id}/checkout accepts checked_out_by from the request body (DocumentCheckoutCreate.checked_out_by) rather than the authenticated user context, allowing any authenticated user to check out a document as any other person_id — a parallel IDOR to the checkin bypass (quality-c6-1).",
+    "task": "Remove checked_out_by from DocumentCheckoutCreate and derive it from require_user_auth (auth[\"person_id\"]) in the endpoint, so checkouts are always attributed to the requesting user.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "api-c7-10",
+    "severity": "low",
+    "category": "api",
+    "file": "app/api/notifications.py",
+    "line": 26,
+    "issue": "GET /notifications/unread-count accepts person_id as a required query parameter with no ownership check, so any authenticated user can query the unread notification count of any other person_id (IDOR).",
+    "task": "Either remove person_id from the query params and derive it from require_user_auth (auth[\"person_id\"]), or add an explicit ownership check that raises 403 if the requesting user's person_id != the requested person_id.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "api-c7-11",
+    "severity": "low",
+    "category": "api",
+    "file": "app/api/ecm_documents.py",
+    "line": 66,
+    "issue": "Approximately 20 list-endpoint handler functions across ecm_documents, ecm_folders, ecm_metadata, ecm_acl, ecm_checkouts, ecm_collaboration, ecm_workflows, and ecm_retention annotate their return type as '-> dict' even though the response_model declares ListResponse[...], causing mypy/pyright false positives and masking type errors in response construction.",
+    "task": "Change the return type annotation of each affected list handler from '-> dict' to the matching Pydantic type (e.g. '-> ListResponse[DocumentRead]') or remove the annotation and rely on response_model for validation.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  }
+]

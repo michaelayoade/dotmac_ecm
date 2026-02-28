@@ -1,0 +1,101 @@
+[
+  {
+    "id": "security-c5-1",
+    "severity": "high",
+    "category": "security",
+    "file": "app/api/persons.py",
+    "line": 46,
+    "issue": "Any authenticated user can update or delete any other person's record — the /people router applies only require_user_auth, with no ownership or admin-role check, enabling full BOLA (Broken Object Level Authorization).",
+    "task": "Add an ownership check in update_person and delete_person so that regular users can only modify their own record, or restrict the entire people router to require_role('admin') and expose a separate /people/me PATCH endpoint for self-service updates.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "security-c5-2",
+    "severity": "high",
+    "category": "security",
+    "file": "app/schemas/webhook.py",
+    "line": 78,
+    "issue": "WebhookEndpointRead includes secret: str | None = None, causing the HMAC signing secret to be returned in plaintext on every GET /webhooks/endpoints response, allowing any authenticated user to exfiltrate secrets belonging to other users.",
+    "task": "Remove the secret field from WebhookEndpointRead (or replace it with a masked/redacted version) so the signing secret is write-only and never returned by the API.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "security-c5-3",
+    "severity": "high",
+    "category": "security",
+    "file": "app/schemas/webhook.py",
+    "line": 30,
+    "issue": "The webhook URL validator blocks IP-literal private addresses but immediately returns any hostname without DNS resolution — an attacker can register a domain resolving to 127.0.0.1 or 169.254.169.254 to perform SSRF via DNS rebinding, bypassing the IPv4 denylist.",
+    "task": "Resolve the hostname to an IP address at validation time (e.g. via socket.getaddrinfo) and apply the same private-network denylist to the resolved address; also block IPv6 link-local (fe80::/10) and unique-local (fc00::/7) ranges.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "security-c5-4",
+    "severity": "medium",
+    "category": "security",
+    "file": "app/api/auth_flow.py",
+    "line": 547,
+    "issue": "The POST /auth/reset-password endpoint has no rate-limiting dependency, while the paired POST /auth/forgot-password is rate-limited at 3/min — an attacker can make unlimited reset attempts without throttling.",
+    "task": "Add _rate_limit_dependency('reset_password', 5) as a dependency on the reset_password_endpoint route, consistent with other auth flow endpoints.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "security-c5-5",
+    "severity": "medium",
+    "category": "security",
+    "file": "app/services/auth_flow.py",
+    "line": 571,
+    "issue": "After a successful MFA verification in mfa_verify(), the short-lived mfa_token JWT is never invalidated or recorded as used — within its 5-minute validity window the same token could be replayed to create additional sessions if the TOTP code is known.",
+    "task": "Track used mfa_tokens (e.g. store token_hash in a redis key or a DB table with TTL) and reject any mfa_token that has already been consumed.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "security-c5-6",
+    "severity": "medium",
+    "category": "security",
+    "file": "app/main.py",
+    "line": 60,
+    "issue": "SecurityHeadersMiddleware sets X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, and Referrer-Policy but omits Content-Security-Policy, leaving the application vulnerable to XSS injection without browser mitigation.",
+    "task": "Add a restrictive Content-Security-Policy header (e.g. default-src 'self') in SecurityHeadersMiddleware, tuned to the actual script/style sources used by the web_home page.",
+    "auto_fixable": true,
+    "effort": "small"
+  },
+  {
+    "id": "security-c5-7",
+    "severity": "medium",
+    "category": "security",
+    "file": "app/services/audit.py",
+    "line": 111,
+    "issue": "audit_events.log_request() reads entity_id directly from the x-entity-id HTTP header without any authentication or validation — any caller can forge the entity_id stored in audit logs, undermining audit integrity.",
+    "task": "Remove the x-entity-id header read and instead derive entity_id from the request path or an authenticated request-state attribute set by the routing layer, or at minimum validate the value against a known entity before storing it.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "security-c5-8",
+    "severity": "low",
+    "category": "security",
+    "file": "app/main.py",
+    "line": 60,
+    "issue": "SecurityHeadersMiddleware does not set the Strict-Transport-Security (HSTS) header, so browsers will not enforce HTTPS-only connections even after the first visit.",
+    "task": "Add response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains' in SecurityHeadersMiddleware (conditionally skip on HTTP-only dev environments).",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "security-c5-9",
+    "severity": "low",
+    "category": "security",
+    "file": "app/services/auth_flow.py",
+    "line": 155,
+    "issue": "The _refresh_cookie_secure() helper defaults to False when neither the REFRESH_COOKIE_SECURE env var nor the DB setting is configured, meaning the HttpOnly refresh-token cookie is sent over plain HTTP in default deployments (regression of c1-10).",
+    "task": "Change the default return value at line 155 from False to True so the cookie is Secure by default, and document that operators must explicitly set REFRESH_COOKIE_SECURE=false for local HTTP development.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  }
+]

@@ -1,0 +1,112 @@
+[
+  {
+    "id": "security-c8-1",
+    "severity": "high",
+    "category": "security",
+    "file": "app/api/settings.py",
+    "line": 36,
+    "issue": "PUT /settings/auth/{key}, /settings/audit/{key}, and /settings/scheduler/{key} require only require_user_auth (any authenticated user), allowing any logged-in user to overwrite security-critical settings such as jwt_secret or jwt_algorithm, which enables session DoS (invalidating all tokens) or JWT algorithm downgrade attacks.",
+    "task": "Change the settings router registration in app/main.py from Depends(require_user_auth) to Depends(require_role('admin')) so that only administrators can mutate domain settings.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "security-c8-2",
+    "severity": "high",
+    "category": "security",
+    "file": "app/schemas/auth.py",
+    "line": 31,
+    "issue": "UserCredentialUpdate includes a password_hash field, so the admin PATCH /user-credentials/{id} endpoint allows setting a raw, arbitrary string as the password hash without passing through hash_password(), enabling an admin to set a known-value hash and then authenticate as any user.",
+    "task": "Remove password_hash from UserCredentialUpdate; if admins need to force a password change, add a dedicated endpoint that calls hash_password() internally and sets must_change_password=True.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "security-c8-3",
+    "severity": "high",
+    "category": "security",
+    "file": "app/api/auth.py",
+    "line": 167,
+    "issue": "POST /sessions (admin-only) accepts arbitrary token_hash and person_id and inserts a fully-active AuthSession row, allowing an admin to forge a session for any user without going through login, effectively impersonating any account without an audit log entry.",
+    "task": "Remove the POST /sessions admin endpoint or gate it behind a superadmin scope; admins who need to inspect sessions should use GET /sessions only; session creation must only happen via the /auth/login and /auth/mfa/verify flows.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "security-c8-4",
+    "severity": "medium",
+    "category": "security",
+    "file": "app/services/ecm_storage.py",
+    "line": 38,
+    "issue": "generate_storage_key() concatenates user-supplied file_name directly into the S3 object key (f'documents/{document_id}/{unique}/{file_name}') without sanitizing path-traversal sequences, allowing a crafted name like '../../secrets/config' to escape the expected prefix.",
+    "task": "Sanitize file_name by stripping leading slashes and replacing or rejecting '..' components before building the storage key, e.g. use Path(file_name).name to extract only the filename portion.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "security-c8-5",
+    "severity": "medium",
+    "category": "security",
+    "file": "app/api/ecm_documents.py",
+    "line": 155,
+    "issue": "POST /ecm/documents/{id}/upload-url passes the user-supplied mime_type directly to the S3 presigned URL ContentType parameter without validating against an allowlist, potentially allowing dangerous types like text/html or application/x-php to be stored and served.",
+    "task": "Add a Literal or Enum allowlist of permitted MIME types to UploadURLRequest and reject requests with unlisted types before calling storage.generate_upload_url().",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "security-c8-6",
+    "severity": "medium",
+    "category": "security",
+    "file": "app/api/notifications.py",
+    "line": 31,
+    "issue": "GET /notifications accepts person_id as an optional query parameter with no ownership check, allowing any authenticated user to enumerate all notifications of any other user.",
+    "task": "Derive person_id from require_user_auth (auth['person_id']) instead of accepting it as a query parameter, mirroring the fix needed for api-c7-10.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "security-c8-7",
+    "severity": "medium",
+    "category": "security",
+    "file": "app/api/notifications.py",
+    "line": 62,
+    "issue": "POST /notifications/mark-all-read takes person_id from the request body (MarkAllReadRequest.person_id) with no ownership check, so any authenticated user can mark all notifications of any other person as read.",
+    "task": "Remove person_id from MarkAllReadRequest and derive it from require_user_auth (auth['person_id']) in the endpoint handler.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "security-c8-8",
+    "severity": "medium",
+    "category": "security",
+    "file": "app/api/notifications.py",
+    "line": 56,
+    "issue": "POST /notifications/mark-read accepts a list of notification_ids in the body with no ownership verification; any authenticated user can silently mark any other user's notifications as read, corrupting their unread state.",
+    "task": "In the mark_read service method, filter notifications to only those owned by the authenticated user (auth['person_id']) before marking them read, and ignore or 404 IDs belonging to other users.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "security-c8-9",
+    "severity": "low",
+    "category": "security",
+    "file": "app/api/notifications.py",
+    "line": 68,
+    "issue": "GET /notifications/{id} and DELETE /notifications/{id} (dismiss) load and operate on notifications by ID with no ownership check, so any authenticated user can read or dismiss any other user's notifications.",
+    "task": "Add an ownership assertion in notifications.get() and notifications.dismiss() that raises 404 if the notification's person_id does not match the authenticated user's person_id.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "security-c8-10",
+    "severity": "low",
+    "category": "security",
+    "file": "app/schemas/auth.py",
+    "line": 113,
+    "issue": "SessionRead schema includes token_hash (the SHA-256 of the raw refresh token) which is returned by the admin GET /sessions and GET /sessions/{id} endpoints; exposing this hash makes preimage attacks against short or low-entropy tokens viable if the admin API is compromised.",
+    "task": "Exclude token_hash from SessionRead using model_config exclude or a field with exclude=True so it is never serialised in API responses; administrators do not need the hash for session management.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  }
+]

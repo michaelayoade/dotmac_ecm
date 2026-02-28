@@ -1,0 +1,112 @@
+[
+  {
+    "id": "quality-c6-1",
+    "severity": "high",
+    "category": "quality",
+    "file": "app/api/ecm_checkouts.py",
+    "line": 58,
+    "issue": "The checkin_document endpoint fetches the checkout record and passes co.checked_out_by directly as the person_id argument to checkouts.checkin(), meaning the service's ownership check always passes — any authenticated user can check in a document checked out by someone else.",
+    "task": "Remove the co.checked_out_by pass-through: derive the acting person_id from the authenticated request context (request.state.actor_id) and pass that to checkouts.checkin() so the service's ownership check is actually enforced.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "quality-c6-2",
+    "severity": "high",
+    "category": "quality",
+    "file": "app/services/common.py",
+    "line": 11,
+    "issue": "coerce_uuid() calls uuid.UUID(str(value)) without catching ValueError; passing any invalid UUID string as a path parameter (e.g. GET /ecm/documents/not-a-uuid) propagates a ValueError through the global exception handler and returns a confusing 500 Internal Server Error instead of a 400/422.",
+    "task": "Wrap the uuid.UUID() call in a try/except ValueError and raise HTTPException(status_code=400, detail='Invalid UUID format') so all endpoints that accept UUID path parameters return a proper 400 on malformed input.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "quality-c6-3",
+    "severity": "medium",
+    "category": "quality",
+    "file": "app/services/ecm_collaboration.py",
+    "line": 164,
+    "issue": "DocumentSubscriptions.create() performs no duplicate check before inserting a new DocumentSubscription; when the same (person_id, document_id) pair is submitted twice the DB unique constraint raises an IntegrityError that propagates as an unhandled 500 instead of a 409 Conflict.",
+    "task": "Before inserting, query for an existing active subscription with the same person_id and document_id; if found, raise HTTPException(status_code=409, detail='Subscription already exists') to return a correct conflict response.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "quality-c6-4",
+    "severity": "medium",
+    "category": "quality",
+    "file": "app/tasks/webhooks.py",
+    "line": 29,
+    "issue": "_find_and_queue() is called inside a try/except that only logs on failure and has no rollback; if the function fails mid-loop (e.g., after db.flush() but before db.commit()), Celery delivery tasks may be queued for WebhookDelivery records that are never committed, leaving dangling tasks that reference non-existent delivery IDs.",
+    "task": "Add db.rollback() to the except handler in deliver_webhooks() so that partial DB changes are undone when _find_and_queue() raises an exception before db.commit().",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "quality-c6-5",
+    "severity": "medium",
+    "category": "quality",
+    "file": "app/services/notification.py",
+    "line": 76,
+    "issue": "mark_all_read() loads every unread Notification for the person into memory via .all() and then updates each row individually in Python before a single commit; for users with thousands of unread notifications this causes unbounded memory consumption and a large number of ORM dirty-checks.",
+    "task": "Replace the load-then-update loop with a single bulk UPDATE statement: db.query(Notification).filter(...).update({'is_read': True, 'read_at': now}, synchronize_session=False) to push the work to the database in one round-trip.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "quality-c6-6",
+    "severity": "medium",
+    "category": "quality",
+    "file": "app/services/ecm_folder.py",
+    "line": 127,
+    "issue": "Folders._recompute_subtree_paths() loads all descendant folders into memory with .all() before patching their paths; for deep or wide folder hierarchies this causes unbounded memory growth; the same pattern exists in Categories._recompute_subtree_paths() at app/services/ecm_metadata.py:347.",
+    "task": "Rewrite both _recompute_subtree_paths() methods to use a batched UPDATE via db.query(Folder).filter(Folder.path.like(f'{old_path}/%')).all() with yield_per() batching, or push the path replacement into a single SQL UPDATE using func.replace().",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "quality-c6-7",
+    "severity": "medium",
+    "category": "quality",
+    "file": "app/services/ecm_folder.py",
+    "line": 104,
+    "issue": "Folders.delete() soft-deletes only the targeted folder (sets is_active=False) without cascading to descendant folders; after deletion, all child folders remain active with is_active=True but their ancestry chain now contains an inactive node, creating inconsistent tree state that breaks path-based traversal.",
+    "task": "After setting the parent folder to is_active=False, issue a bulk UPDATE to set is_active=False on all rows where path starts with the deleted folder's path, mirroring the subtree logic already present in _recompute_subtree_paths(); apply the same fix to Categories.delete() in app/services/ecm_metadata.py:322.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "quality-c6-8",
+    "severity": "medium",
+    "category": "quality",
+    "file": "app/services/ecm_metadata.py",
+    "line": 334,
+    "issue": "Categories._compute_path() silently returns /{category.name} when a declared parent_id does not resolve in the database, masking orphaned-category data corruption — the same silent-fallback pattern reported for ecm_folder.py in quality-c2-10 but not yet fixed in the metadata service.",
+    "task": "Log a warning (e.g. logger.warning('Category %s parent %s not found, treating as root', category.id, category.parent_id)) and/or raise an HTTPException(500) when parent lookup fails, consistent with the fix being applied to Folders._compute_path() as part of quality-c2-10.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "quality-c6-9",
+    "severity": "low",
+    "category": "quality",
+    "file": "app/services/webhook.py",
+    "line": 45,
+    "issue": "WebhookEndpoints.list() and WebhookDeliveries.list() use the legacy db.query() / .filter() API instead of the SQLAlchemy 2.0 select() + db.scalars() pattern used consistently across all ECM services; the same legacy API is used in notification.py:38, domain_settings.py:98, audit.py:74, auth_flow.py, person.py, rbac.py, and scheduler.py.",
+    "task": "Migrate WebhookEndpoints.list() and WebhookDeliveries.list() (and other non-ECM services) from db.query(Model).filter(...).all() to select(Model).where(...) + db.scalars().all() to unify the codebase on the SQLAlchemy 2.0 query style.",
+    "auto_fixable": false,
+    "effort": "medium"
+  },
+  {
+    "id": "quality-c6-10",
+    "severity": "low",
+    "category": "quality",
+    "file": "app/api/ecm_checkouts.py",
+    "line": 58,
+    "issue": "A stale TODO comment ('person_id should come from auth context; for now accept from query') has been present since initial implementation and describes the missing ownership enforcement that constitutes the quality-c6-1 authorization bypass.",
+    "task": "Remove the stale comment once quality-c6-1 is fixed; if person_id must still be accepted from a non-auth source in some cases, replace the open-ended comment with a specific rationale and a linked issue.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  }
+]

@@ -1,0 +1,123 @@
+[
+  {
+    "id": "security-c2-1",
+    "severity": "high",
+    "category": "security",
+    "file": "app/services/auth_flow.py",
+    "line": 155,
+    "issue": "REGRESSION (c1-10 was merged but not applied): _refresh_cookie_secure() still returns False as its default, transmitting refresh tokens over unencrypted HTTP unless REFRESH_COOKIE_SECURE is explicitly set in every environment.",
+    "task": "Change the final `return False` in _refresh_cookie_secure() to `return True` so the secure flag is on by default, and document the env var override for local development.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "security-c2-2",
+    "severity": "high",
+    "category": "security",
+    "file": "app/schemas/webhook.py",
+    "line": 77,
+    "issue": "REGRESSION (c1-6 was merged but not applied): WebhookEndpointRead still includes the raw `secret` field, returning the HMAC signing secret to any authenticated user who lists or reads webhook endpoints.",
+    "task": "Remove the `secret` field from WebhookEndpointRead and replace it with a boolean `has_secret: bool` computed from `secret is not None` so the signing secret is write-only.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "security-c2-3",
+    "severity": "high",
+    "category": "security",
+    "file": "app/schemas/ecm.py",
+    "line": 103,
+    "issue": "DocumentVersionCreate accepts any user-supplied storage_key (up to 1024 chars) without validating it against the expected documents/{doc_id}/... prefix, allowing an authenticated user to create a version pointing to any arbitrary S3 object and then call /download-url to obtain a presigned read URL for it.",
+    "task": "Add a pydantic validator on DocumentVersionCreate.storage_key that enforces the prefix `documents/` and rejects any key containing `..` or absolute path components; also validate storage_key in create_version() in the service layer.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "security-c2-4",
+    "severity": "high",
+    "category": "security",
+    "file": "app/api/ecm_documents.py",
+    "line": 41,
+    "issue": "The document API authenticates users (require_user_auth at router level) but never checks DocumentACL or FolderACL permissions before serving read, update, delete, or download-url operations; any authenticated user can access, modify, or download any document regardless of ACL.",
+    "task": "Add ACL enforcement in Documents.get(), update(), delete(), and in the download-url endpoint: query DocumentACL for the requesting user's person_id and required permission (read/write/delete), raise HTTPException(403) if no matching active ACL exists.",
+    "auto_fixable": false,
+    "effort": "medium"
+  },
+  {
+    "id": "security-c2-5",
+    "severity": "medium",
+    "category": "security",
+    "file": "app/main.py",
+    "line": 49,
+    "issue": "REGRESSION (c1-7 was merged but not applied): No CORSMiddleware is registered on the FastAPI application, leaving the API with no cross-origin access policy and enabling CSRF-style attacks from malicious browser origins.",
+    "task": "Add `from fastapi.middleware.cors import CORSMiddleware` and `app.add_middleware(CORSMiddleware, allow_origins=os.getenv('CORS_ALLOW_ORIGINS','').split(','), allow_credentials=True, allow_methods=['*'], allow_headers=['*'])` after the SecurityHeadersMiddleware registration.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "security-c2-6",
+    "severity": "medium",
+    "category": "security",
+    "file": "app/services/audit.py",
+    "line": 111,
+    "issue": "The audit log reads entity_id from the raw x-entity-id HTTP header (log_request line 111), allowing any client to inject arbitrary entity ID values into the audit trail and associate audit events with resources they never actually accessed.",
+    "task": "Remove the `x-entity-id` header read; instead resolve entity_id from request.state (set by route handlers) or derive it from the URL path parameters, falling back to None when not available.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "security-c2-7",
+    "severity": "medium",
+    "category": "security",
+    "file": "app/api/auth_flow.py",
+    "line": 87,
+    "issue": "When Redis is unavailable, _rate_limit_dependency raises HTTP 503 on every call, making all rate-limited auth endpoints (login, mfa/verify, refresh, forgot-password) completely inaccessible — a Redis outage or targeted disruption causes a full authentication DoS.",
+    "task": "Add a fallback strategy to _rate_limit_dependency: log a warning and allow the request through (fail-open) when Redis is unreachable, rather than raising 503; document that strict enforcement requires Redis availability.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "security-c2-8",
+    "severity": "medium",
+    "category": "security",
+    "file": "app/schemas/webhook.py",
+    "line": 30,
+    "issue": "The _validate_webhook_url function only checks IP-literal hostnames for private ranges; when the hostname is a domain name, ipaddress.ip_address() raises ValueError and the function returns without any check, making the SSRF guard bypassable via DNS rebinding or internal DNS names that resolve to RFC-1918 addresses.",
+    "task": "Add a DNS resolution step in _validate_webhook_url: resolve the hostname to an IP (socket.getaddrinfo) and apply the same private-range check to the resolved address; reject URLs where resolution fails or resolves to a blocked range.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "security-c2-9",
+    "severity": "medium",
+    "category": "security",
+    "file": "app/api/auth_flow.py",
+    "line": 511,
+    "issue": "The change_password and reset_password endpoints apply no password complexity requirements, allowing users to set a single-character password (e.g. 'a') which is trivially brute-forceable.",
+    "task": "Add a shared validate_password_strength() helper that enforces minimum length (e.g. 12 chars) and at least one character class; call it in change_password() before hashing and in reset_password() in auth_flow_service.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "security-c2-10",
+    "severity": "low",
+    "category": "security",
+    "file": "app/services/ecm_storage.py",
+    "line": 39,
+    "issue": "generate_storage_key embeds the raw file_name string into the S3 key without stripping leading slashes or path separators, allowing a crafted file_name like '../other-tenant/data.pdf' to create an unexpected S3 key structure that may overlap with keys of other documents or tenants.",
+    "task": "Sanitize file_name in generate_storage_key by replacing path separators and stripping leading dots/slashes: `safe_name = Path(file_name).name` or equivalent before building the key.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "security-c2-11",
+    "severity": "low",
+    "category": "security",
+    "file": "app/api/auth_flow.py",
+    "line": 536,
+    "issue": "The forgot_password endpoint skips send_password_reset_email when the email is not found, but processes it when found; the added SMTP latency (~100-500ms) for known emails creates a timing oracle that allows enumeration of registered email addresses despite the uniform 200 response.",
+    "task": "Call send_password_reset_email unconditionally (passing a no-op or dummy invocation via a background task when result is None) to equalise response time between found and not-found paths; alternatively use asyncio.sleep to pad to a fixed minimum duration.",
+    "auto_fixable": false,
+    "effort": "small"
+  }
+]

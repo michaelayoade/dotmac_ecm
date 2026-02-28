@@ -1,0 +1,14 @@
+{
+  "started_at": "2026-02-27T05:24:46Z",
+  "restarts": {
+    "coordinator": 36,
+    "sentinel": 2,
+    "pm": 3,
+    "ci-monitor": 2,
+    "metrics": 2,
+    "conflict-detector": 2,
+    "docs-agent": 2
+  },
+  "health_checks": 851,
+  "last_health": "7/8 agents healthy"
+}

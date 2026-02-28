@@ -1,0 +1,123 @@
+[
+  {
+    "id": "api-c10-1",
+    "severity": "high",
+    "category": "api",
+    "file": "app/api/search.py",
+    "line": 21,
+    "issue": "The search endpoint declares `q: str = Query(default=\"\", min_length=0)`, allowing an empty query string which is passed as a wildcard ILIKE pattern and causes a full-table sequential scan on every request, making this a trivially exploitable DoS vector.",
+    "task": "Change the `q` parameter to `q: str = Query(default=None, min_length=1)` and return an empty list when `q` is None, or enforce `min_length=1` with no default to require a non-empty search term.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "api-c10-2",
+    "severity": "high",
+    "category": "api",
+    "file": "app/schemas/notification.py",
+    "line": 29,
+    "issue": "`MarkReadRequest.notification_ids: list[UUID]` has no maximum length constraint, so a single authenticated request can submit tens of thousands of IDs and trigger an unbounded bulk UPDATE query, enabling a DoS via application-level bulk write.",
+    "task": "Add a `max_length` constraint to the `notification_ids` field: `notification_ids: list[UUID] = Field(max_length=100)` to cap the number of notifications that can be bulk-marked in a single request.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "api-c10-3",
+    "severity": "medium",
+    "category": "api",
+    "file": "app/api/notifications.py",
+    "line": 56,
+    "issue": "`POST /notifications/mark-read` has no `response_model` declaration, so the `{\"marked\": count}` dict response is not validated, not documented in OpenAPI, and not type-safe for API clients.",
+    "task": "Define a `MarkReadResponse(BaseModel)` with a `marked: int` field in `app/schemas/notification.py` and set `response_model=MarkReadResponse` on the `mark_read` endpoint.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "api-c10-4",
+    "severity": "medium",
+    "category": "api",
+    "file": "app/api/notifications.py",
+    "line": 62,
+    "issue": "`POST /notifications/mark-all-read` has no `response_model` declaration, so the `{\"marked\": count}` dict response is undocumented and unvalidated, consistent with the mark-read endpoint gap.",
+    "task": "Reuse the `MarkReadResponse` defined for api-c10-3 and set `response_model=MarkReadResponse` on the `mark_all_read` endpoint.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "api-c10-5",
+    "severity": "medium",
+    "category": "api",
+    "file": "app/api/scheduler.py",
+    "line": 64,
+    "issue": "`POST /scheduler/tasks/refresh` has no `response_model`, returning an opaque dict from `scheduler_service.refresh_schedule()` with no documented schema for API clients or OpenAPI.",
+    "task": "Define a `RefreshScheduleResponse(BaseModel)` schema in `app/schemas/scheduler.py` and set it as `response_model` on the `refresh_schedule` endpoint, or use the existing `ScheduledTaskRead` list response if appropriate.",
+    "auto_fixable": false,
+    "effort": "trivial"
+  },
+  {
+    "id": "api-c10-6",
+    "severity": "medium",
+    "category": "api",
+    "file": "app/api/scheduler.py",
+    "line": 69,
+    "issue": "`POST /scheduler/tasks/{task_id}/enqueue` has no `response_model`, returning an opaque dict from `scheduler_service.enqueue_task()` with no contract for callers.",
+    "task": "Define an `EnqueueResponse(BaseModel)` schema (e.g., `task_name: str`, `queued: bool`) in `app/schemas/scheduler.py` and set it as `response_model` on the `enqueue_scheduled_task` endpoint.",
+    "auto_fixable": false,
+    "effort": "trivial"
+  },
+  {
+    "id": "api-c10-7",
+    "severity": "medium",
+    "category": "api",
+    "file": "app/api/ecm_checkouts.py",
+    "line": 71,
+    "issue": "`GET /ecm/documents/checkouts` accepts only `limit` and `offset` with no filter parameters (no `person_id`, `document_id`, or `status`), making it impossible for clients to query checkouts by owner or document without fetching all records and filtering client-side.",
+    "task": "Add optional filter query parameters `person_id: str | None = None`, `document_id: str | None = None`, and `is_active: bool | None = None` to `list_checkouts`, pass them to `checkouts.list_checkouts()`, and update the service method to apply these filters.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "api-c10-8",
+    "severity": "medium",
+    "category": "api",
+    "file": "app/api/ecm_collaboration.py",
+    "line": 59,
+    "issue": "The `status_filter` query parameter (aliased as `status`) accepts any arbitrary string across multiple list endpoints (comments, workflow instances, workflow tasks, document retentions); invalid enum values silently return 0 results instead of a 400 error, making API misuse undetectable.",
+    "task": "Replace `str | None` with the appropriate `Literal` or `Enum` type for each status field (e.g., `status_filter: Literal['draft', 'active', 'resolved'] | None = None`), so FastAPI validates and rejects invalid values with a 422 response at the routing layer.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "api-c10-9",
+    "severity": "low",
+    "category": "api",
+    "file": "app/api/auth_flow.py",
+    "line": 292,
+    "issue": "Six endpoint handlers in `auth_flow.py` (`update_me` line 292, `upload_avatar` line 342, `delete_avatar` line 364, `revoke_session` line 439, `revoke_all_other_sessions` line 474, `change_password` line 515) call `db.commit()` directly inside the handler function rather than through a service method, mixing persistence concerns into the API layer and making unit testing harder.",
+    "task": "Extract the DB mutation logic in each of these six handlers into dedicated service methods in `app/services/auth_flow.py` that call `db.flush()`, then have the handlers call `db.commit()` only once at the router level, or adopt the commit-on-success `get_db()` pattern used by ECM routers.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "api-c10-10",
+    "severity": "low",
+    "category": "api",
+    "file": "app/api/ecm_documents.py",
+    "line": 66,
+    "issue": "All list endpoint handler functions across 9+ ECM router files declare `-> dict` as their Python return type while the route decorator specifies `response_model=ListResponse[...]`; mypy treats the response as an untyped dict, masking schema drift between what the service returns and what the endpoint declares.",
+    "task": "Change all list handler return type annotations from `-> dict` to `-> ListResponse[<EntityRead>]` (or `-> dict` with `# type: ignore` if the service returns a plain dict that FastAPI coerces) to align Python type annotations with the declared response_model contract.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "api-c10-11",
+    "severity": "low",
+    "category": "api",
+    "file": "app/api/auth_flow.py",
+    "line": 157,
+    "issue": "`POST /auth/mfa/setup` accepts a `person_id` field in the request body and validates it matches the JWT subject, implementing the actor-from-body anti-pattern; redundant body field bloats the schema and could confuse clients who omit it expecting it to default to the authenticated user.",
+    "task": "Remove `person_id` from `MfaSetupRequest` entirely and derive the person identifier exclusively from `auth[\"person_id\"]` in the handler, eliminating the redundant ownership check.",
+    "auto_fixable": false,
+    "effort": "trivial"
+  }
+]

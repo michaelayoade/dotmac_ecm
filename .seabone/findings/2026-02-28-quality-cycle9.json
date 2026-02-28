@@ -1,0 +1,123 @@
+[
+  {
+    "id": "quality-c9-1",
+    "severity": "high",
+    "category": "quality",
+    "file": "app/tasks/notifications.py",
+    "line": 94,
+    "issue": "The `send_notification_email` Celery task is registered but never dispatched from `_dispatch()`; email delivery for subscription events is silently dead code — the placeholder log says 'Would send email' but the task is never enqueued from anywhere in the codebase.",
+    "task": "Either wire `send_notification_email.delay(person_id=..., title=..., body=...)` into the `_dispatch()` loop after each Notification is created, or remove the task entirely if email notifications are intentionally deferred to a later milestone.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "quality-c9-2",
+    "severity": "high",
+    "category": "quality",
+    "file": "app/api/ecm_workflows.py",
+    "line": 252,
+    "issue": "POST /ecm/workflow-tasks/{task_id}/complete has no assignee ownership check — any authenticated user can approve or reject any workflow task by calling the endpoint with an arbitrary task_id, bypassing the intended approval workflow.",
+    "task": "In `WorkflowTasks.complete()`, verify that the acting user (derived from require_user_auth) matches `task.assignee_id` before accepting the status change; optionally allow admin override via require_role('admin').",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "quality-c9-3",
+    "severity": "medium",
+    "category": "quality",
+    "file": "app/tasks/notifications.py",
+    "line": 85,
+    "issue": "`_matches_event()` returns False for an empty `subscribed_types` list (subscriber receives nothing), while `_endpoint_matches()` in tasks/webhooks.py:87 returns True for an empty `event_types` list (endpoint receives everything) — opposite semantics cause silent misconfiguration when subscriptions have no event types set.",
+    "task": "Align the two helpers on a single semantic (document the contract), apply it consistently, and add a unit test covering the empty-list edge case for both helpers.",
+    "auto_fixable": false,
+    "effort": "trivial"
+  },
+  {
+    "id": "quality-c9-4",
+    "severity": "medium",
+    "category": "quality",
+    "file": "app/services/ecm_legal_hold.py",
+    "line": 181,
+    "issue": "`LegalHoldDocuments.delete()` calls `db.delete(lhd)` (hard delete), while the parent `LegalHolds.delete()` and all other ECM delete methods use `is_active = False` soft deletes; hard-deleting legal hold document associations permanently removes evidence of documents under legal hold.",
+    "task": "Replace `db.delete(lhd)` with `lhd.is_active = False; db.flush()` and add `is_active` column to `LegalHoldDocument` model if missing, matching the soft-delete pattern used across the ECM layer.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "quality-c9-5",
+    "severity": "medium",
+    "category": "quality",
+    "file": "app/main.py",
+    "line": 115,
+    "issue": "`_load_audit_settings()` releases `_AUDIT_SETTINGS_LOCK` after the cache-hit guard and re-acquires it only for the write, so N concurrent threads on a cold/expired cache all bypass the guard in parallel and each issue a redundant DB query before writing the same result — a thundering herd on cache expiry.",
+    "task": "Perform both the DB query and the cache write inside a single `with _AUDIT_SETTINGS_LOCK:` block, or use a proper double-checked locking pattern that holds the lock across the entire cache-miss path.",
+    "auto_fixable": false,
+    "effort": "trivial"
+  },
+  {
+    "id": "quality-c9-6",
+    "severity": "medium",
+    "category": "quality",
+    "file": "app/api/ecm_checkouts.py",
+    "line": 52,
+    "issue": "The POST /{document_id}/checkin endpoint declares `response_model=dict` which disables Pydantic response validation, suppresses the OpenAPI schema for the response body, and makes the response contract opaque to API consumers and generated clients.",
+    "task": "Define a `CheckinResponse` Pydantic model (e.g. `class CheckinResponse(BaseModel): detail: str`) in `app/schemas/ecm_acl.py` and use it as the `response_model` for the checkin endpoint.",
+    "auto_fixable": false,
+    "effort": "trivial"
+  },
+  {
+    "id": "quality-c9-7",
+    "severity": "medium",
+    "category": "quality",
+    "file": "tests/conftest.py",
+    "line": 196,
+    "issue": "The `client` fixture dependency-override map omits `app.api.auth.get_db` (the admin auth management router covering /user-credentials, /sessions, /mfa-methods, /api-keys), so tests exercising those endpoints via the TestClient will reach the production database instead of the in-memory test database.",
+    "task": "Add `from app.api.auth import get_db as auth_mgmt_get_db` and `app.dependency_overrides[auth_mgmt_get_db] = override_get_db` to the client fixture alongside the existing overrides.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "quality-c9-8",
+    "severity": "medium",
+    "category": "quality",
+    "file": "app/services/notification.py",
+    "line": 67,
+    "issue": "`Notifications.mark_read()`, `mark_all_read()`, and `dismiss()` call `db.commit()` directly inside service methods rather than `db.flush()`, coupling the service layer to the router's commit strategy and creating an inconsistency with all ECM services that use `db.flush()` and delegate commit to the router.",
+    "task": "Replace `db.commit()` calls with `db.flush()` in `notification.py` service methods, and apply the same fix to `webhook.py` (create/update/delete), then update the notifications and webhooks router `get_db()` functions to use the commit-on-success pattern matching the ECM routers.",
+    "auto_fixable": true,
+    "effort": "small"
+  },
+  {
+    "id": "quality-c9-9",
+    "severity": "medium",
+    "category": "quality",
+    "file": "app/services/auth_flow.py",
+    "line": 767,
+    "issue": "`reset_password()` reads the PasswordResetToken with `used_at IS NULL` and then marks it used in the same transaction, but without a pessimistic row-level lock; two concurrent POST /auth/reset-password requests with the same token can both pass the `used_at IS NULL` check before either commits, effectively allowing double-use of a single-use reset token.",
+    "task": "Use `SELECT FOR UPDATE` on the PasswordResetToken row before checking `used_at`, or execute an atomic `UPDATE ... WHERE used_at IS NULL` and check the affected-row count to ensure the token is consumed exactly once.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "quality-c9-10",
+    "severity": "low",
+    "category": "quality",
+    "file": "app/services/ecm_checkout.py",
+    "line": 44,
+    "issue": "`Checkouts.checkout()` calls `db.flush()` twice in succession — once inside the try block at line 38 and again unconditionally at line 44 after the try/except — making the second call redundant and indicative of a copy-paste error.",
+    "task": "Remove the second `db.flush()` call at line 44; the flush inside the try block followed by `db.refresh(checkout)` is sufficient.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "quality-c9-11",
+    "severity": "low",
+    "category": "quality",
+    "file": "tests/conftest.py",
+    "line": 228,
+    "issue": "`_create_access_token` has `roles: list[str] = None` and `scopes: list[str] = None` which are incorrect type annotations — `None` is not a valid default for `list[str]`; mypy and type checkers would flag these as errors.",
+    "task": "Change the annotations to `roles: list[str] | None = None` and `scopes: list[str] | None = None` to correctly express optional list parameters.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  }
+]

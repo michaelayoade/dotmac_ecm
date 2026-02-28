@@ -1,0 +1,90 @@
+[
+  {
+    "id": "security-c12-1",
+    "severity": "high",
+    "category": "security",
+    "file": "app/api/auth_flow.py",
+    "line": 177,
+    "issue": "`POST /auth/mfa/confirm` has no rate limiting dependency, allowing an attacker to brute-force the 6-digit TOTP confirmation code during MFA setup (10^6 possibilities within a 30-second TOTP window).",
+    "task": "Add `dependencies=[Depends(_rate_limit_dependency('mfa_confirm', 5))]` to the `/auth/mfa/confirm` route decorator in `app/api/auth_flow.py`.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "security-c12-2",
+    "severity": "medium",
+    "category": "security",
+    "file": "app/api/notifications.py",
+    "line": 26,
+    "issue": "`GET /notifications/unread-count` accepts `person_id` as a required query parameter with no ownership check, allowing any authenticated user to query any other user's unread notification count (6th endpoint in the notification IDOR cluster not included in the cycle-8 finding).",
+    "task": "Add ownership check in `unread_count` handler: compare `person_id` query param against `auth['person_id']` from `require_user_auth` and return 403 if they do not match.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "security-c12-3",
+    "severity": "medium",
+    "category": "security",
+    "file": "app/schemas/webhook.py",
+    "line": 48,
+    "issue": "`WebhookEndpointCreate.created_by` is a user-supplied UUID field in the request body, allowing any authenticated user to register webhook endpoints attributed to any other person (actor-from-body IDOR extending the pattern first identified for checkout and dispose).",
+    "task": "Remove `created_by` from `WebhookEndpointCreate`, inject it server-side from the `require_user_auth` dependency in the `create_endpoint` handler, and update `webhook_endpoints.create()` to accept `person_id` as a parameter.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "security-c12-4",
+    "severity": "medium",
+    "category": "security",
+    "file": "app/schemas/ecm_collaboration.py",
+    "line": 17,
+    "issue": "`CommentCreate.author_id` is a user-supplied UUID field in the request body, allowing any authenticated user to post ECM comments attributed to any other user (actor-from-body IDOR).",
+    "task": "Remove `author_id` from `CommentCreate`, inject it server-side from the `require_user_auth` dependency in the `create_comment` handler, and update `comments.create()` to accept `author_id` as a separate parameter.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "security-c12-5",
+    "severity": "medium",
+    "category": "security",
+    "file": "app/schemas/ecm_collaboration.py",
+    "line": 48,
+    "issue": "`DocumentSubscriptionCreate.person_id` is a user-supplied UUID field, allowing any authenticated user to create document subscriptions attributed to any other person (actor-from-body IDOR).",
+    "task": "Remove `person_id` from `DocumentSubscriptionCreate`, inject it server-side from the `require_user_auth` dependency in the `create_document_subscription` handler, and update `document_subscriptions.create()` to accept `person_id` as a separate parameter.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "security-c12-6",
+    "severity": "medium",
+    "category": "security",
+    "file": "app/services/avatar.py",
+    "line": 52,
+    "issue": "`save_avatar()` calls `await file.read()` to load the entire uploaded file into memory before checking the file size limit; concurrent requests with files exceeding `avatar_max_size_bytes` can exhaust server memory (DoS via memory exhaustion).",
+    "task": "Add a streaming size check: read in chunks and raise HTTP 413 if total bytes exceed `settings.avatar_max_size_bytes` before accumulating all data, or enforce a maximum content-length via middleware before the handler.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "security-c12-7",
+    "severity": "low",
+    "category": "security",
+    "file": "app/schemas/ecm_collaboration.py",
+    "line": 16,
+    "issue": "`CommentBase.body: str` has no `max_length` constraint, allowing an authenticated user to store arbitrarily large comment text and cause database bloat or memory pressure during retrieval.",
+    "task": "Add `body: str = Field(max_length=10000)` (or a similarly reasonable limit) to `CommentBase` in `app/schemas/ecm_collaboration.py`.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "security-c12-8",
+    "severity": "low",
+    "category": "security",
+    "file": "app/schemas/webhook.py",
+    "line": 47,
+    "issue": "`WebhookEndpointCreate.event_types: list[str]` has no max-items or per-item `max_length` constraint; an authenticated user could register a webhook with thousands of arbitrary event-type strings, causing unbounded DB storage and O(N) matching in `_endpoint_matches()` per event.",
+    "task": "Add a `max_length` constraint to each event-type string item and cap the list length (e.g., `event_types: list[Annotated[str, Field(max_length=100)]] = Field(max_items=50)`) in `WebhookEndpointCreate`.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  }
+]

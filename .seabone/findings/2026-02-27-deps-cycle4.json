@@ -1,0 +1,130 @@
+[
+  {
+    "id": "deps-c4-1",
+    "severity": "high",
+    "category": "deps",
+    "file": "pyproject.toml",
+    "line": 28,
+    "issue": "python-jose 3.3.0 is still pinned in pyproject.toml despite fix-deps-1 being marked complete; CVE-2024-33664 and CVE-2024-33663 remain exploitable, and app/observability.py:6 and app/services/auth_flow.py:11 still import from jose — the changelog was updated but pyproject.toml and application code were never changed.",
+    "task": "Actually replace python-jose with joserfc (or equivalent) in pyproject.toml, update all `from jose import` statements in app/observability.py and app/services/auth_flow.py, then run the full test suite to confirm no regressions.",
+    "auto_fixable": false,
+    "effort": "medium",
+    "regression_of": "deps-1"
+  },
+  {
+    "id": "deps-c4-2",
+    "severity": "high",
+    "category": "deps",
+    "file": "pyproject.toml",
+    "line": 17,
+    "issue": "jinja2 3.1.4 is still pinned in pyproject.toml despite fix-deps-2 being marked complete; CVE-2024-56201 (sandbox escape via __init__.__globals__) and CVE-2024-56326 (|attr filter bypass) remain present — the changelog was updated but pyproject.toml was never modified.",
+    "task": "Update jinja2 to >=3.1.6 in pyproject.toml and run `poetry update jinja2` to regenerate the lock file.",
+    "auto_fixable": true,
+    "effort": "trivial",
+    "regression_of": "deps-2"
+  },
+  {
+    "id": "deps-c4-3",
+    "severity": "medium",
+    "category": "deps",
+    "file": "pyproject.toml",
+    "line": 21,
+    "issue": "httpx 0.27.0 is still pinned in pyproject.toml despite fix-deps-6 being marked complete; 0.28.x includes security hardening and this outdated version remains in the webhook delivery path (existing SSRF vector) — the changelog was updated but pyproject.toml was never modified.",
+    "task": "Update httpx to >=0.28.0 in pyproject.toml and run `poetry update httpx`.",
+    "auto_fixable": true,
+    "effort": "trivial",
+    "regression_of": "deps-6"
+  },
+  {
+    "id": "deps-c4-4",
+    "severity": "medium",
+    "category": "deps",
+    "file": "pyproject.toml",
+    "line": 31,
+    "issue": "cryptography 42.0.8 is still pinned in pyproject.toml despite fix-deps-4 being marked complete; multiple security patches exist in 43.x–46.x — the changelog was updated but pyproject.toml was never modified.",
+    "task": "Update cryptography to >=46.0.0 in pyproject.toml and run `poetry update cryptography`, verifying passlib/jose compatibility after upgrade.",
+    "auto_fixable": true,
+    "effort": "small",
+    "regression_of": "deps-4"
+  },
+  {
+    "id": "deps-c4-5",
+    "severity": "medium",
+    "category": "deps",
+    "file": "pyproject.toml",
+    "line": 25,
+    "issue": "opentelemetry-instrumentation-fastapi, -sqlalchemy, and -celery are still pinned at beta 0.47b0 in pyproject.toml despite fix-deps-5 being marked complete; pre-release observability instrumentation in production receives no CVE tracking — the changelog was updated but pyproject.toml was never modified.",
+    "task": "Update all three opentelemetry-instrumentation-* packages to a stable release (>=0.50b0 or latest) in pyproject.toml and run `poetry update`.",
+    "auto_fixable": true,
+    "effort": "small",
+    "regression_of": "deps-5"
+  },
+  {
+    "id": "deps-c4-6",
+    "severity": "medium",
+    "category": "deps",
+    "file": "app/services/search.py",
+    "line": 69,
+    "issue": "app/services/search.py:69 accesses `db.bind.dialect.name` using the SQLAlchemy 1.4-deprecated `Session.bind` attribute; in SQLAlchemy 2.0+ this emits SADeprecationWarning on every search call and will be removed in a future SQLAlchemy version, causing a hard AttributeError at runtime.",
+    "task": "Replace `db.bind.dialect.name if db.bind else 'sqlite'` with `db.get_bind().dialect.name` or inspect the engine directly via `db.get_bind().dialect.name` to use the current SQLAlchemy 2.x API.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "deps-c4-7",
+    "severity": "medium",
+    "category": "deps",
+    "file": "pyproject.toml",
+    "line": 10,
+    "issue": "fastapi is pinned to 0.111.0 (released June 2024), which is approximately 18 months behind current releases; FastAPI minor versions bundle Starlette security patches and the pinned version will not receive any upstream fixes.",
+    "task": "Update fastapi to >=0.115.0 in pyproject.toml and run `poetry update fastapi uvicorn` together, reviewing Starlette and FastAPI changelogs for any breaking changes.",
+    "auto_fixable": true,
+    "effort": "small"
+  },
+  {
+    "id": "deps-c4-8",
+    "severity": "low",
+    "category": "deps",
+    "file": "pyproject.toml",
+    "line": 15,
+    "issue": "pydantic 2.7.4 is still pinned in pyproject.toml despite fix-deps-8 being marked complete; pydantic 2.10+ includes validation correctness fixes — the changelog was updated but pyproject.toml was never modified.",
+    "task": "Update pydantic to >=2.10.0 in pyproject.toml and run `poetry update pydantic pydantic-core`.",
+    "auto_fixable": true,
+    "effort": "trivial",
+    "regression_of": "deps-8"
+  },
+  {
+    "id": "deps-c4-9",
+    "severity": "low",
+    "category": "deps",
+    "file": "pyproject.toml",
+    "line": 16,
+    "issue": "python-dotenv is still pinned to 1.0.1 in pyproject.toml despite fix-deps-9 being marked complete; 1.2.1 is the latest with bug fixes — the changelog was updated but pyproject.toml was never modified.",
+    "task": "Update python-dotenv to >=1.2.1 in pyproject.toml and run `poetry update python-dotenv`.",
+    "auto_fixable": true,
+    "effort": "trivial",
+    "regression_of": "deps-9"
+  },
+  {
+    "id": "deps-c4-10",
+    "severity": "low",
+    "category": "deps",
+    "file": "app/api",
+    "line": null,
+    "issue": "The app/api/ directory has no __init__.py file, making it a namespace package; some tooling (mypy, coverage, certain pytest import modes) may fail to discover modules correctly or produce incomplete type-checking results.",
+    "task": "Create an empty app/api/__init__.py file to make the package explicit and avoid namespace package edge cases.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "deps-c4-11",
+    "severity": "low",
+    "category": "deps",
+    "file": "app/schemas",
+    "line": null,
+    "issue": "The app/schemas/ directory has no __init__.py file, making it a namespace package; same tooling compatibility concerns as app/api/ apply.",
+    "task": "Create an empty app/schemas/__init__.py file to make the package explicit.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  }
+]

@@ -1,0 +1,178 @@
+[
+  {
+    "id": "security-c1-1",
+    "severity": "critical",
+    "category": "security",
+    "file": "app/services/audit.py",
+    "line": 108,
+    "issue": "Audit log reads actor_type and actor_id from raw HTTP headers (x-actor-type, x-actor-id), allowing any client to forge arbitrary actor identities in the audit trail.",
+    "task": "Replace header-based actor extraction with values from request.state.actor_id (set by auth middleware); only fall back to 'system' when no authenticated actor is present.",
+    "auto_fixable": true,
+    "effort": "small"
+  },
+  {
+    "id": "security-c1-2",
+    "severity": "high",
+    "category": "security",
+    "file": "app/schemas/webhook.py",
+    "line": 12,
+    "issue": "Webhook endpoint URL field accepts any string with no validation, enabling SSRF by allowing the server to make HTTP requests to internal services when delivering webhooks.",
+    "task": "Add a pydantic validator to the WebhookEndpointCreate.url field that rejects private/loopback IP ranges (RFC 1918, 127.x, 169.254.x, ::1) and non-HTTP(S) schemes.",
+    "auto_fixable": true,
+    "effort": "small"
+  },
+  {
+    "id": "security-c1-3",
+    "severity": "high",
+    "category": "security",
+    "file": "app/api/auth_flow.py",
+    "line": 80,
+    "issue": "The /auth/login, /auth/forgot-password, /auth/mfa/verify, and /auth/refresh endpoints have no rate limiting, enabling brute-force and credential-stuffing attacks at the network level.",
+    "task": "Add Redis-backed rate limiting (using slowapi or a custom dependency) to the login, forgot-password, mfa/verify, and refresh endpoints, enforcing limits per source IP.",
+    "auto_fixable": false,
+    "effort": "medium"
+  },
+  {
+    "id": "security-c1-4",
+    "severity": "high",
+    "category": "security",
+    "file": "app/services/auth_flow.py",
+    "line": 756,
+    "issue": "Password reset tokens (JWT) are not invalidated after use; within their TTL window the same token can be used multiple times to change the password repeatedly.",
+    "task": "After a successful password reset, store the token's jti or hash in a short-lived Redis/DB blacklist and reject it on subsequent use.",
+    "auto_fixable": false,
+    "effort": "medium"
+  },
+  {
+    "id": "security-c1-5",
+    "severity": "high",
+    "category": "security",
+    "file": ".env.agent-swarm",
+    "line": null,
+    "issue": "File contains live API credentials (DeepSeek API key, Telegram bot token) and is not covered by .gitignore, risking accidental commit and secret exposure.",
+    "task": "Add .env.agent-swarm to .gitignore (add the pattern '.env.agent-swarm' under the 'Environment variables' section) and rotate the exposed credentials immediately.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "security-c1-6",
+    "severity": "medium",
+    "category": "security",
+    "file": "app/schemas/webhook.py",
+    "line": 32,
+    "issue": "WebhookEndpointRead schema includes the raw signing secret, returning it to any authenticated user who reads or lists webhook endpoints.",
+    "task": "Remove the 'secret' field from WebhookEndpointRead (replace with a boolean 'has_secret' flag) so that the HMAC signing secret is write-only.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "security-c1-7",
+    "severity": "medium",
+    "category": "security",
+    "file": "app/main.py",
+    "line": 46,
+    "issue": "No CORS middleware is configured, leaving the API with no cross-origin access policy and enabling CSRF-style attacks from malicious browser-based origins.",
+    "task": "Add CORSMiddleware to the FastAPI app with an explicit allow_origins list (from env var); deny credentials for wildcard origins.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "security-c1-8",
+    "severity": "medium",
+    "category": "security",
+    "file": "app/services/auth.py",
+    "line": 55,
+    "issue": "API keys are stored as unsalted SHA-256 hashes, making them vulnerable to precomputation (rainbow table) attacks if the api_keys table is compromised.",
+    "task": "Replace hashlib.sha256 in hash_api_key() with HMAC-SHA256 using a server-side HMAC_SECRET env var, adding a constant-time comparison in lookups.",
+    "auto_fixable": true,
+    "effort": "small"
+  },
+  {
+    "id": "security-c1-9",
+    "severity": "medium",
+    "category": "security",
+    "file": "app/services/avatar.py",
+    "line": 15,
+    "issue": "Avatar file type is validated using only the client-supplied Content-Type header, allowing upload of malicious files (e.g. SVG with XSS payload, PHP scripts) with a spoofed content type.",
+    "task": "Read the first 512 bytes of the uploaded file and verify the magic bytes match the declared content type using the python-magic library before saving.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "security-c1-10",
+    "severity": "medium",
+    "category": "security",
+    "file": "app/services/auth_flow.py",
+    "line": 153,
+    "issue": "The refresh cookie secure flag defaults to False, transmitting session refresh tokens over unencrypted HTTP connections when REFRESH_COOKIE_SECURE is not explicitly set.",
+    "task": "Change the default return value of _refresh_cookie_secure() to True so that the secure flag is on by default; document the env var override for local dev.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "security-c1-11",
+    "severity": "low",
+    "category": "security",
+    "file": "app/main.py",
+    "line": 54,
+    "issue": "No HTTP security headers are set (X-Frame-Options, X-Content-Type-Options, Content-Security-Policy, Strict-Transport-Security), leaving the app exposed to clickjacking, MIME sniffing, and other browser-based attacks.",
+    "task": "Add a middleware that appends standard security headers (X-Frame-Options: DENY, X-Content-Type-Options: nosniff, etc.) to every HTTP response.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "security-c1-12",
+    "severity": "low",
+    "category": "security",
+    "file": "app/main.py",
+    "line": 221,
+    "issue": "The /metrics endpoint exposes Prometheus metrics (request counts, latency, error rates, route paths) without any authentication, leaking internal service topology to anonymous clients.",
+    "task": "Protect the /metrics endpoint with a shared secret checked via a Bearer token or restrict access using network-level controls; add a simple API-key check as a minimum.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "security-c1-13",
+    "severity": "low",
+    "category": "security",
+    "file": "app/config.py",
+    "line": 13,
+    "issue": "The DATABASE_URL setting falls back to postgres:postgres@localhost default credentials, which will be silently used in environments where the env var is not set.",
+    "task": "Remove the hardcoded default credentials from DATABASE_URL fallback; raise a startup error if DATABASE_URL is not set in non-development environments.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "security-c1-14",
+    "severity": "medium",
+    "category": "security",
+    "file": "app/services/email.py",
+    "line": 99,
+    "issue": "The send_password_reset_email function embeds person_name directly into an HTML email body without HTML-escaping, enabling HTML injection via a crafted display_name value.",
+    "task": "Wrap the name variable with html.escape() from the stdlib before interpolating it into the body_html f-string in send_password_reset_email().",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "security-c1-15",
+    "severity": "low",
+    "category": "security",
+    "file": "app/services/search.py",
+    "line": 30,
+    "issue": "The document search builds an ILIKE pattern directly from user input (f\"%{q}%\") without escaping SQL LIKE wildcards, allowing authenticated users to trigger expensive full-table scans via crafted queries.",
+    "task": "Escape % and _ in the q parameter before building the ILIKE pattern (e.g. q.replace('%','\\\\%').replace('_','\\\\_')) to limit wildcard-based query abuse.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "security-c1-16",
+    "severity": "low",
+    "category": "security",
+    "file": "app/services/auth_dependencies.py",
+    "line": 157,
+    "issue": "The require_user_auth and require_audit_auth dependencies set request.state.actor_id but never set request.state.actor_type, causing the audit logger to record actor_type='system' for all authenticated user and API-key requests.",
+    "task": "In require_user_auth set request.state.actor_type = 'user', and in the API-key branch of require_audit_auth set request.state.actor_type = 'api_key', so audit logs capture the correct actor type.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  }
+]

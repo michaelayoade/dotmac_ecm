@@ -1,0 +1,25 @@
+{
+  "models": {
+    "deepseek-chat": {
+      "success": 14
+    },
+    "gpt-5.3-codex": {
+      "success": 6,
+      "failure": 13,
+      "categories": {
+        "general": {
+          "failure": 5
+        },
+        "frontend": {
+          "failure": 4
+        },
+        "security": {
+          "failure": 4
+        }
+      }
+    },
+    "sonnet": {
+      "success": 2
+    }
+  }
+}

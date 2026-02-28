@@ -1,0 +1,167 @@
+[
+  {
+    "id": "api-c3-1",
+    "severity": "high",
+    "category": "api",
+    "file": "app/api/notifications.py",
+    "line": 56,
+    "issue": "POST /notifications/mark-read has no response_model declaration and returns a raw dict {\"marked\": count}, bypassing Pydantic validation and leaving the response contract undocumented in OpenAPI.",
+    "task": "Add response_model=MarkReadResponse (or a shared CountResponse schema) to the @router.post decorator and return the Pydantic instance rather than a raw dict.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "api-c3-2",
+    "severity": "high",
+    "category": "api",
+    "file": "app/api/notifications.py",
+    "line": 62,
+    "issue": "POST /notifications/mark-all-read has no response_model declaration and returns a raw dict {\"marked\": count}, bypassing Pydantic validation and leaving the response contract undocumented in OpenAPI.",
+    "task": "Add response_model=MarkReadResponse (or a shared CountResponse schema) to the @router.post decorator and return the Pydantic instance rather than a raw dict.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "api-c3-3",
+    "severity": "high",
+    "category": "api",
+    "file": "app/api/scheduler.py",
+    "line": 64,
+    "issue": "POST /scheduler/tasks/refresh has no response_model and returns whatever refresh_schedule() returns (an unvalidated raw dict), so consumers have no documented response contract.",
+    "task": "Define a ScheduleRefreshResponse Pydantic schema (e.g. {refreshed: bool, task_count: int}) and add response_model to the @router.post decorator.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "api-c3-4",
+    "severity": "high",
+    "category": "api",
+    "file": "app/api/scheduler.py",
+    "line": 69,
+    "issue": "POST /scheduler/tasks/{task_id}/enqueue has no response_model and returns whatever enqueue_task() returns (an unvalidated raw dict), so consumers have no documented response contract.",
+    "task": "Define an EnqueueTaskResponse Pydantic schema (e.g. {task_id: str, celery_task_id: str}) and add response_model to the @router.post decorator.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "api-c3-5",
+    "severity": "high",
+    "category": "api",
+    "file": "app/api/auth.py",
+    "line": 28,
+    "issue": "Nine routers (auth, rbac, persons, scheduler, notifications, webhooks, settings, audit, search) define get_db() with only try/finally db.close() and no db.commit() or db.rollback(), while the nine ECM routers use the full commit-on-success/rollback-on-exception pattern; any service that relies on the dependency to commit (rather than calling db.commit() itself) will silently lose data in the basic-pattern routers.",
+    "task": "Centralise get_db() in app/db.py (or app/api/deps.py) using the full commit/rollback/close pattern, then delete the per-router copies; or audit each affected service to confirm explicit commits exist before keeping the simple pattern.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "api-c3-6",
+    "severity": "medium",
+    "category": "api",
+    "file": "app/api/ecm_checkouts.py",
+    "line": 52,
+    "issue": "POST /{document_id}/checkin uses response_model=dict, which explicitly disables Pydantic response serialisation and validation, leaking raw ORM or internal fields and producing no useful OpenAPI schema.",
+    "task": "Create a CheckinResponse Pydantic model (e.g. {detail: str}), change response_model=dict to response_model=CheckinResponse, and return CheckinResponse(detail=\"Document checked in successfully\").",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "api-c3-7",
+    "severity": "medium",
+    "category": "api",
+    "file": "app/api/ecm_checkouts.py",
+    "line": 78,
+    "issue": "GET /ecm/documents/checkouts returns count=len(items) which equals the current page size rather than the total number of matching checkouts, making pagination metadata incorrect for clients.",
+    "task": "Add a separate .count() query before applying limit/offset and return the total as the count field in the response dict.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "api-c3-8",
+    "severity": "medium",
+    "category": "api",
+    "file": "app/api/ecm_documents.py",
+    "line": 130,
+    "issue": "GET /{document_id}/versions returns count=len(items) which equals the current page size rather than the total version count for the document, making pagination metadata incorrect.",
+    "task": "Add a separate .count() query for the document's versions before applying limit/offset and return the total as the count field in the response dict.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "api-c3-9",
+    "severity": "medium",
+    "category": "api",
+    "file": "app/api/audit.py",
+    "line": 40,
+    "issue": "All 20+ list endpoints accept order_by as a free-form string with no validation against an allowlist of valid column names; an invalid value triggers a 500 error that may reveal internal database schema details in the error message (systemic across all list endpoints).",
+    "task": "Add a pattern= regex or Literal[] type constraint to the order_by Query parameter in each list endpoint (or centralise in apply_ordering) so unknown column names return a 422 Unprocessable Entity rather than 500.",
+    "auto_fixable": false,
+    "effort": "medium"
+  },
+  {
+    "id": "api-c3-10",
+    "severity": "medium",
+    "category": "api",
+    "file": "app/main.py",
+    "line": 189,
+    "issue": "_include_api_router() registers every router twice (at / and at /api/v1), causing every endpoint to appear twice in the OpenAPI schema and doubling the /docs surface area, making the API documentation confusing and inflating client SDK generation.",
+    "task": "Either commit to a single prefix strategy (e.g. always mount under /api/v1 and redirect bare paths) or use separate include_router calls only for routers that need dual registration, adding tags/summary overrides to prevent duplicate schema entries.",
+    "auto_fixable": false,
+    "effort": "medium"
+  },
+  {
+    "id": "api-c3-11",
+    "severity": "medium",
+    "category": "api",
+    "file": "app/api/auth.py",
+    "line": 25,
+    "issue": "auth.py defines APIRouter() with no prefix, so admin-only routes (/user-credentials, /mfa-methods, /sessions, /api-keys) are mounted at the root namespace rather than under /auth or /admin, inconsistent with every other router and making the URL structure implicit.",
+    "task": "Add prefix=\"/auth\" (or prefix=\"/admin/auth\") to the APIRouter() constructor in auth.py to group these admin endpoints under a consistent namespace.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "api-c3-12",
+    "severity": "low",
+    "category": "api",
+    "file": "app/api/ecm_checkouts.py",
+    "line": 61,
+    "issue": "checkin_document calls checkouts.get_checkout(db, document_id) in the handler to obtain the checked_out_by value, then passes that to checkouts.checkin(), which likely performs the same lookup internally, creating a redundant DB round-trip.",
+    "task": "Modify checkouts.checkin() to accept an optional checked_out_by parameter and look it up internally, eliminating the redundant get_checkout() call in the endpoint handler.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "api-c3-13",
+    "severity": "low",
+    "category": "api",
+    "file": "app/api/ecm_checkouts.py",
+    "line": 71,
+    "issue": "GET /ecm/documents/checkouts is a system-wide list endpoint mounted under the /ecm/documents prefix, making it semantically appear as a child of the document collection when it is actually a standalone resource; URL should be /ecm/checkouts.",
+    "task": "Move the list_checkouts endpoint to a dedicated router (e.g. app/api/ecm_checkouts_list.py) with prefix /ecm, or change the ecm_checkouts router prefix to /ecm so the route becomes /ecm/checkouts.",
+    "auto_fixable": false,
+    "effort": "small"
+  },
+  {
+    "id": "api-c3-14",
+    "severity": "low",
+    "category": "api",
+    "file": "app/api/scheduler.py",
+    "line": 64,
+    "issue": "POST /scheduler/tasks/refresh (static path) is defined after GET /scheduler/tasks/{task_id} (dynamic path) in the same router; while FastAPI resolves this correctly today because they use different HTTP methods, adding any POST /tasks/{task_id} route in the future would silently shadow the /tasks/refresh route.",
+    "task": "Reorder routes so static paths (/tasks/refresh) are declared before dynamic paths (/tasks/{task_id}) within the same HTTP method to prevent future shadowing.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  },
+  {
+    "id": "api-c3-15",
+    "severity": "low",
+    "category": "api",
+    "file": "app/main.py",
+    "line": 202,
+    "issue": "Twelve ECM and utility routers are imported in the middle of main.py (lines 202-213) with # noqa: E402 suppression, violating PEP8 import ordering and making it harder to audit all registered routes from the top of the file.",
+    "task": "Move all router imports to the top of main.py alongside the existing imports and remove the # noqa: E402 suppressions.",
+    "auto_fixable": true,
+    "effort": "trivial"
+  }
+]
