@@ -31,11 +31,15 @@ def register_error_handlers(app) -> None:
     async def validation_exception_handler(
         request: Request, exc: RequestValidationError
     ):
+        # exc.errors() ctx may contain raw Exception objects (not JSON-serialisable).
+        # Sanitise by converting each error to string-safe form.
+        errors = [
+            {k: str(v) if k == "ctx" else v for k, v in err.items()}
+            for err in exc.errors(include_url=False)
+        ]
         return JSONResponse(
             status_code=422,
-            content=_error_payload(
-                "validation_error", "Validation error", exc.errors()
-            ),
+            content=_error_payload("validation_error", "Validation error", errors),
         )
 
     @app.exception_handler(Exception)
