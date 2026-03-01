@@ -27,15 +27,15 @@ class SearchService:
         query = db.query(Document).filter(Document.is_active.is_(True))
 
         if q:
-            # Escape SQL LIKE wildcards to prevent wildcard injection
-            # Two backslashes in Python string creates single backslash in actual string
-            # SQL will interpret the backslash as escaping the wildcard
-            q_escaped = q.replace('%', '\\%').replace('_', '\\_')
+            # Escape SQL LIKE wildcards to prevent wildcard injection.
+            # The backslash must also be escaped first so literal backslashes
+            # in the query don't collide with the escape character.
+            q_escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             pattern = f"%{q_escaped}%"
             query = query.filter(
-                Document.title.ilike(pattern)
-                | Document.description.ilike(pattern)
-                | Document.file_name.ilike(pattern)
+                Document.title.ilike(pattern, escape="\\")
+                | Document.description.ilike(pattern, escape="\\")
+                | Document.file_name.ilike(pattern, escape="\\")
             )
 
         if folder_id is not None:

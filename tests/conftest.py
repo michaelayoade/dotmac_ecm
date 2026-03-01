@@ -73,13 +73,13 @@ os.environ["TOTP_ENCRYPTION_KEY"] = "QLUJktsTSfZEbST4R-37XmQ0tCkiVCBXZN2Zt053w8g
 os.environ["TOTP_ISSUER"] = "StarterTemplate"
 
 # Now import the models - they'll use our mocked db module
-from app.models.person import Person
-from app.models.auth import UserCredential, Session as AuthSession, SessionStatus
-from app.models.rbac import Role, Permission, PersonRole
-from app.models.audit import AuditEvent, AuditActorType
-from app.models.domain_settings import DomainSetting, SettingDomain
-from app.models.scheduler import ScheduledTask, ScheduleType
-from app.models.ecm import (  # noqa: F401
+from app.models.person import Person  # noqa: E402
+from app.models.auth import UserCredential, Session as AuthSession, SessionStatus  # noqa: E402
+from app.models.rbac import Role, Permission, PersonRole  # noqa: E402
+from app.models.audit import AuditEvent, AuditActorType  # noqa: E402
+from app.models.domain_settings import DomainSetting, SettingDomain  # noqa: E402
+from app.models.scheduler import ScheduledTask, ScheduleType  # noqa: E402
+from app.models.ecm import (  # noqa: E402, F401
     ACLPermission,
     Category,
     ClassificationLevel,
@@ -466,6 +466,7 @@ def document(db_session, person, folder):
         mime_type="application/pdf",
         created_by=person.id,
         folder_id=folder.id,
+        is_active=True,
     )
     db_session.add(doc)
     db_session.commit()

@@ -190,7 +190,7 @@ class TestAvatarSizeLimits:
                     with patch.object(
                         avatar_service.settings, "avatar_url_prefix", "/static/avatars"
                     ):
-                        url = await avatar_service.save_avatar(file, "person-456")
+                        await avatar_service.save_avatar(file, "person-456")
                         assert upload_dir.exists()
 
 

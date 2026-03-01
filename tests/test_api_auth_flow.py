@@ -638,7 +638,9 @@ class TestAuthFlowRateLimiting:
         response = client.post("/auth/refresh", json=payload)
         assert response.status_code == 429
 
-    def test_rate_limit_returns_503_when_redis_is_unavailable(self, client, monkeypatch):
+    def test_rate_limit_returns_503_when_redis_is_unavailable(
+        self, client, monkeypatch
+    ):
         monkeypatch.setattr(auth_flow_api, "_get_rate_limit_redis_client", lambda: None)
         response = client.post(
             "/auth/login", json={"username": "nonexistent", "password": "wrongpassword"}

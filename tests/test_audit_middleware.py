@@ -248,7 +248,7 @@ class TestAuditMiddlewareReadTriggers:
                 mock_db = MagicMock()
                 mock_session.return_value = mock_db
                 with patch("app.main.audit_service") as mock_audit:
-                    result = await audit_middleware(request, call_next)
+                    await audit_middleware(request, call_next)
                     # GET without trigger should not log
                     mock_audit.audit_events.log_request.assert_not_called()
 
@@ -280,7 +280,7 @@ class TestAuditMiddlewareReadTriggers:
                 mock_db = MagicMock()
                 mock_session.return_value = mock_db
                 with patch("app.main.audit_service") as mock_audit:
-                    result = await audit_middleware(request, call_next)
+                    await audit_middleware(request, call_next)
                     # GET with header trigger should log
                     mock_audit.audit_events.log_request.assert_called_once()
 
@@ -310,7 +310,7 @@ class TestAuditMiddlewareReadTriggers:
                 mock_db = MagicMock()
                 mock_session.return_value = mock_db
                 with patch("app.main.audit_service") as mock_audit:
-                    result = await audit_middleware(request, call_next)
+                    await audit_middleware(request, call_next)
                     mock_audit.audit_events.log_request.assert_called_once()
 
 
@@ -406,5 +406,5 @@ class TestAuditMiddlewareDisabled:
                 mock_db = MagicMock()
                 mock_session.return_value = mock_db
                 with patch("app.main.audit_service") as mock_audit:
-                    result = await audit_middleware(request, call_next)
+                    await audit_middleware(request, call_next)
                     mock_audit.audit_events.log_request.assert_not_called()

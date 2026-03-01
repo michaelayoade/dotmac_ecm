@@ -129,7 +129,7 @@ class TestCheckRetentionExpiry:
     def test_publishes_retention_expired_event(
         self, db_session, person, folder
     ) -> None:
-        retention = self._make_retention(
+        self._make_retention(
             db_session,
             person,
             folder,
