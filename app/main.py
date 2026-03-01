@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import logging
 import os
 import hmac
 
@@ -32,6 +33,8 @@ from app.logging import configure_logging
 from app.observability import ObservabilityMiddleware
 from app.telemetry import setup_otel
 from app.errors import register_error_handlers
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -75,11 +78,19 @@ register_error_handlers(app)
 async def audit_middleware(request: Request, call_next):
     response: Response
     path = request.url.path
-    db = SessionLocal()
     try:
-        audit_settings = _load_audit_settings(db)
-    finally:
-        db.close()
+        db = SessionLocal()
+        try:
+            audit_settings = _load_audit_settings(db)
+        finally:
+            db.close()
+    except Exception:
+        logger.exception(
+            "Failed to load audit settings, skipping audit for %s %s",
+            request.method,
+            path,
+        )
+        return await call_next(request)
     if not audit_settings["enabled"]:
         return await call_next(request)
     header_key = audit_settings.get("read_trigger_header") or ""
@@ -100,6 +111,12 @@ async def audit_middleware(request: Request, call_next):
                 audit_service.audit_events.log_request(
                     db, request, Response(status_code=500)
                 )
+            except Exception:
+                logger.exception(
+                    "Failed to log audit event for %s %s",
+                    request.method,
+                    path,
+                )
             finally:
                 db.close()
         raise
@@ -107,6 +124,12 @@ async def audit_middleware(request: Request, call_next):
         db = SessionLocal()
         try:
             audit_service.audit_events.log_request(db, request, response)
+        except Exception:
+            logger.exception(
+                "Failed to log audit event for %s %s",
+                request.method,
+                path,
+            )
         finally:
             db.close()
     return response
