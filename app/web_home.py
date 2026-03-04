@@ -54,6 +54,7 @@ def home(request: Request, db: Session = Depends(get_db)):
             "request": request,
             "title": brand_name,
             "people": people,
+            "people_count": len(people),
             "brand": brand,
         },
     )
