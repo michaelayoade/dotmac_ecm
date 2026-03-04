@@ -34,11 +34,7 @@ def register_error_handlers(app) -> None:
         # exc.errors() ctx may contain raw Exception objects (not JSON-serialisable).
         # Sanitise by converting each error to string-safe form.
         errors = [
-            {
-                k: (str(v) if k == "ctx" else v)
-                for k, v in err.items()
-                if k != "url"
-            }
+            {k: (str(v) if k == "ctx" else v) for k, v in err.items() if k != "url"}
             for err in exc.errors()
         ]
         return JSONResponse(
