@@ -70,7 +70,6 @@ static/avatars/*
 Thumbs.db
 
 # Poetry
-poetry.lock
 
 # Docker
 .docker/
